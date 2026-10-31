@@ -9,6 +9,7 @@ export function createRequestProofClient(config: AgentConfig): RequestProofClien
 
 export type {
   AgentAction, AgentClock, AgentClockReading, AgentConfig, AgentEndpoints, AgentPermission, AgentRegistration,
+  GenericAgentConfig, GenericAgentRegistration, NamedServicePermission, ServiceActionDescriptor,
   AgentTlsConfig, AuthorizationDetail, DeviceAuthorizationRequest, PreparedCodeMetadata, PreparedOwnerRequest,
   PreparedRequestRecord, PricesReadPermission, BoundedAgentPermission, OrderPreviewPermission, SandboxExecutePermission,
   RegisteredAgentClient, RequestProofAuthorizationCodeInput, RequestProofDeviceInput,

@@ -115,6 +115,8 @@ test('rejects malformed configuration, input and deadlines before native authori
     { ...valid, timeoutMs: 0 }, { ...valid, timeoutMs: 5001 }, { ...valid, maxConcurrent: 17 },
   ];
   for (const value of invalid) assert.throws(() => createNativeAuthorizationTransport(value), TypeError);
+  const systemTrust = createNativeAuthorizationTransport(configuration(h, { tls: {} }));
+  await systemTrust.close();
   const accessor = configuration(h);
   Object.defineProperty(accessor, 'timeoutMs', { enumerable: true, get() { throw new Error('must not run accessor'); } });
   assert.throws(() => createNativeAuthorizationTransport(accessor), TypeError);

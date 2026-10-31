@@ -11,6 +11,8 @@ import { createAgentKey } from '../src/key.mjs';
 import { createProtectedResourceClient, ResourceInvocationError } from '../src/resource-client.mjs';
 import { publicJwk, resourceExample, signingPorts } from './documentation-fixture.mjs';
 
+const energyVector = JSON.parse(readFileSync(new URL('../../../protocol/resource-profiles/merx.energy-purchase.v1-draft.1.vectors.json', import.meta.url)));
+
 function openssl(dir, ...args) { execFileSync('openssl', args, { cwd: dir, stdio: 'ignore' }); }
 function certificates() {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'atum-agent-resource-client-'));
@@ -21,6 +23,19 @@ function certificates() {
   return { dir, ca: readFileSync(path.join(dir, 'ca.pem'), 'utf8'), cert: readFileSync(path.join(dir, 'server.pem')), key: readFileSync(path.join(dir, 'server.key')) };
 }
 function reply(res, status, value, headers = {}) { const bytes = Buffer.from(JSON.stringify(value)); res.writeHead(status, { 'content-type': 'application/json', 'content-length': String(bytes.length), 'cache-control': 'no-store', ...headers }); res.end(bytes); }
+
+function energyExample(key) {
+  const sample = resourceExample(key); const action = structuredClone(energyVector.valid_action);
+  action.parameters.quote_expires_at_ms += 1;
+  const registration = { ...sample.registration, environment: 'production', operation_namespace: 'energy',
+    resource_profile_version: 'merx.energy-purchase.v1-draft.1',
+    resource_profile_hash: 'sha256:e1c5106dc710ce0ba3d846f3cb376358eb858c35adfbac906f0ff58f3a6451fa',
+    account_required_actions: ['energy.purchase'] };
+  const context = { ...sample.context, environment: registration.environment,
+    operation_namespace: registration.operation_namespace, resource_profile_version: registration.resource_profile_version,
+    resource_profile_hash: registration.resource_profile_hash, action: action.action, action_hash: actionHash(action) };
+  return { ...sample, registration, context, action };
+}
 
 test('public client performs exactly one nonce continuation and fences attempted operation IDs', async t => {
   const certs = certificates(); let calls = 0;
@@ -70,6 +85,72 @@ test('public client performs exactly one nonce continuation and fences attempted
   const priceResult = await client.invoke({ access_token: sample.accessToken, context: priceContext, action_request: prices });
   assert.deepEqual(priceResult.result, { prices: [] });
   assert.equal(calls, 13);
+  await client.close();
+});
+
+test('public Energy client accepts only the exact bounded delivered result and fences every attempted operation', async t => {
+  const certs = certificates(); let calls = 0; const outcomes = new Map();
+  const server = https.createServer({ cert: certs.cert, key: certs.key }, async (req, res) => {
+    calls += 1; const chunks = []; for await (const chunk of req) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks));
+    if (!JSON.parse(Buffer.from(req.headers.dpop.split('.')[1], 'base64url')).nonce) {
+      return reply(res, 401, { error: 'use_dpop_nonce' }, {
+        'dpop-nonce': Buffer.alloc(32, 19).toString('base64url'),
+        'www-authenticate': 'DPoP error="use_dpop_nonce", algs="ES256"',
+      });
+    }
+    const selected = outcomes.get(body.context.operation_id);
+    return reply(res, selected.httpStatus, { profile: 'merx-atum-resource-v1-draft.1',
+      operation_id: body.context.operation_id, action_hash: body.context.action_hash,
+      intent_hash: intentHash(body.context), state: selected.state, result: selected.result });
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); rmSync(certs.dir, { recursive: true, force: true }); });
+  const key = await createAgentKey({ publicJwk, sign: signingPorts().signingPort.signEs256IeeeP1363 });
+  const sample = energyExample(key);
+  const endpoint = { method: 'POST', url: `https://localhost:${server.address().port}/v1/atum/operations` };
+  const client = createProtectedResourceClient({ registration: sample.registration, key, endpoint,
+    clock: sample.clock, tls: { ca: certs.ca } });
+  const delivered = (order_id, charged_sun) => ({ order_id, status: 'delivered', charged_sun });
+  const cases = [
+    ['lower bound', true, { httpStatus: 200, state: 'succeeded', result: delivered('123e4567-e89b-42d3-a456-426614174000', '1105000') }],
+    ['upper bound', true, { httpStatus: 200, state: 'succeeded', result: delivered('223e4567-e89b-42d3-a456-426614174000', '1205000') }],
+    ['pending null', true, { httpStatus: 202, state: 'unknown', result: null }],
+    ['failed null', true, { httpStatus: 200, state: 'failed', result: null }],
+    ['malformed', false, { httpStatus: 200, state: 'succeeded', result: [] }],
+    ['extra field', false, { httpStatus: 200, state: 'succeeded', result: { ...delivered('323e4567-e89b-42d3-a456-426614174000', '1105000'), provider_id: 'hidden' } }],
+    ['under quote', false, { httpStatus: 200, state: 'succeeded', result: delivered('423e4567-e89b-42d3-a456-426614174000', '1104999') }],
+    ['over spend', false, { httpStatus: 200, state: 'succeeded', result: delivered('523e4567-e89b-42d3-a456-426614174000', '1205001') }],
+    ['uppercase id', false, { httpStatus: 200, state: 'succeeded', result: delivered('623E4567-E89B-42D3-A456-426614174000', '1105000') }],
+    ['wrong uuid version', false, { httpStatus: 200, state: 'succeeded', result: delivered('723e4567-e89b-32d3-a456-426614174000', '1105000') }],
+    ['newline id', false, { httpStatus: 200, state: 'succeeded', result: delivered('723e4567-e89b-42d3-a456-426614174000\n', '1105000') }],
+    ['wrong status', false, { httpStatus: 200, state: 'succeeded', result: { ...delivered('823e4567-e89b-42d3-a456-426614174000', '1105000'), status: 'pending' } }],
+    ['numeric SUN', false, { httpStatus: 200, state: 'succeeded', result: delivered('923e4567-e89b-42d3-a456-426614174000', 1105000) }],
+    ['leading-zero SUN', false, { httpStatus: 200, state: 'succeeded', result: delivered('a23e4567-e89b-42d3-a456-426614174000', '01105000') }],
+    ['unsafe SUN', false, { httpStatus: 200, state: 'succeeded', result: delivered('b23e4567-e89b-42d3-a456-426614174000', '9007199254740992') }],
+    ['newline SUN', false, { httpStatus: 200, state: 'succeeded', result: delivered('c23e4567-e89b-42d3-a456-426614174000', '1105000\n') }],
+  ];
+  let byte = 20;
+  for (const [name, accepted, outcome] of cases) {
+    const context = { ...sample.context, operation_id: Buffer.alloc(32, byte++).toString('base64url') };
+    const actionRequest = structuredClone(sample.action);
+    outcomes.set(context.operation_id, outcome); const input = { access_token: sample.accessToken, context, action_request: actionRequest };
+    const pending = client.invoke(input);
+    if (name === 'under quote') {
+      actionRequest.parameters.resource_cost_sun = '1';
+      actionRequest.parameters.max_total_debit_sun = '9007199254740991';
+    }
+    if (accepted) {
+      const result = await pending;
+      assert.deepEqual(result.result, outcome.result, name); assert.equal(Object.isFrozen(result.result ?? result), true, name);
+    } else {
+      await assert.rejects(pending, error => error instanceof ResourceInvocationError && error.code === 'temporarily_unavailable', name);
+      const attemptedCalls = calls;
+      await assert.rejects(client.invoke(input), error => error instanceof ResourceInvocationError && error.code === 'operation_conflict', `${name} retry`);
+      assert.equal(calls, attemptedCalls, `${name} retry must not issue HTTP`);
+    }
+  }
+  assert.equal(calls, cases.length * 2);
   await client.close();
 });
 

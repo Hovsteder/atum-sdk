@@ -2,6 +2,7 @@ import { randomBytes, X509Certificate } from 'node:crypto';
 import https from 'node:https';
 import { isIP } from 'node:net';
 import tls from 'node:tls';
+import { MERX_ENERGY_V1, MERX_SANDBOX_V1, normalizeProfileGrant, validateResourceRegistration } from '@atum/verification/resource-profiles';
 
 import { AgentError, agentKeyTimeout, assertAgentKey } from './key.mjs';
 import { canonical, parseClosedJson, snapshotData } from './strict.mjs';
@@ -19,8 +20,8 @@ const PEM_CERTIFICATE = /^-----BEGIN CERTIFICATE-----\r?\n(?:[A-Za-z0-9+/]{1,64}
 const ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const OPAQUE_ARTIFACT = /^[A-Za-z0-9_-]{43}$/;
 const COMPACT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
-const ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute']);
-const CONFIG_FIELDS = new Set(['client_id', 'token_url', 'tls', 'key', 'clock', 'timeoutMs', 'maxConcurrent']);
+const ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute', 'energy.purchase']);
+const CONFIG_FIELDS = new Set(['client_id', 'token_url', 'tls', 'key', 'clock', 'registration', 'descriptor', 'timeoutMs', 'maxConcurrent']);
 const CODE_FIELDS = new Set(['code', 'code_verifier', 'redirect_uri', 'expected_authorization_details']);
 const DEVICE_FIELDS = new Set(['device_code', 'expected_authorization_details']);
 const REFRESH_FIELDS = new Set(['refresh_token', 'expected_authorization_details']);
@@ -102,19 +103,25 @@ function endpoint(value) {
 function configuration(value) {
   const source = record(value, CONFIG_FIELDS, invalidConfig);
   if (!['client_id', 'token_url', 'tls', 'key', 'clock'].every(field => Object.hasOwn(source, field))
-      || (Reflect.ownKeys(source).length !== 5 && Reflect.ownKeys(source).length !== 6 && Reflect.ownKeys(source).length !== 7)
+      || Reflect.ownKeys(source).length < 5 || Reflect.ownKeys(source).length > 9
       || typeof source.client_id !== 'string' || !ID.test(source.client_id) || typeof source.clock !== 'function') invalidConfig();
-  const transportTls = record(source.tls, new Set(['ca']), invalidConfig);
-  if (Reflect.ownKeys(transportTls).length !== 1) invalidConfig();
-  const ca = caBundle(transportTls.ca);
+  const tlsFields = source.tls && Object.hasOwn(source.tls, 'ca') ? new Set(['ca']) : new Set();
+  const transportTls = record(source.tls, tlsFields, invalidConfig);
+  const ca = Object.hasOwn(transportTls, 'ca') ? caBundle(transportTls.ca) : undefined;
   const timeoutMs = Object.hasOwn(source, 'timeoutMs') ? source.timeoutMs : 5000;
   const maxConcurrent = Object.hasOwn(source, 'maxConcurrent') ? source.maxConcurrent : 4;
   if (!integer(timeoutMs, 1, 5000) || !integer(maxConcurrent, 1, 16)) invalidConfig();
   let key;
   try { key = assertAgentKey(source.key); } catch { invalidConfig(); }
+  let profile = null;
+  if (Object.hasOwn(source, 'registration') || Object.hasOwn(source, 'descriptor')) {
+    if (!Object.hasOwn(source, 'registration')) invalidConfig();
+    try { profile = validateResourceRegistration(snapshotData(source.registration),
+      Object.hasOwn(source, 'descriptor') ? snapshotData(source.descriptor) : undefined).profile; } catch { invalidConfig(); }
+  }
   const target = endpoint(source.token_url);
   try { tls.createSecureContext({ ca, minVersion: 'TLSv1.2' }); } catch { invalidConfig(); }
-  return Object.freeze({ client_id: source.client_id, target, ca, key, clock: source.clock, timeoutMs, maxConcurrent });
+  return Object.freeze({ client_id: source.client_id, target, ca, key, profile, clock: source.clock, timeoutMs, maxConcurrent });
 }
 
 function responseHeaders(response) {
@@ -154,7 +161,7 @@ function createTokenTransport(saved) {
   let agent;
   try {
     agent = new https.Agent({ keepAlive: false, maxSockets: saved.maxConcurrent, maxFreeSockets: 0,
-      maxCachedSessions: 0, ca: saved.ca, minVersion: 'TLSv1.2', rejectUnauthorized: true });
+      maxCachedSessions: 0, ...(saved.ca === undefined ? {} : { ca: saved.ca }), minVersion: 'TLSv1.2', rejectUnauthorized: true });
   } catch { invalidConfig(); }
   let closed = false;
   const operations = new Set();
@@ -263,18 +270,20 @@ function permission(value) {
     max_duration: value.max_duration, max_price_sun: value.max_price_sun });
 }
 
-function authorizationDetails(value) {
+function authorizationDetails(value, configuredProfile = null) {
   let source;
   try { source = snapshotData(value); } catch { throw invalidRequest(); }
   if (!Array.isArray(source) || source.length !== 1 || !exact(source[0], ['type', 'permissions', 'grant_limit', 'grant_expires_at_ms'])
       || source[0].type !== 'atum' || !Array.isArray(source[0].permissions) || source[0].permissions.length < 1
-      || source[0].permissions.length > 3 || !integer(source[0].grant_limit, 0, 1_000_000_000)
+      || source[0].permissions.length > (configuredProfile?.kind === 'service' ? configuredProfile.actions.length : 3)
+      || !integer(source[0].grant_limit, 0, 1_000_000_000)
       || !integer(source[0].grant_expires_at_ms, 1, MAX_TIME)) throw invalidRequest();
-  const permissions = source[0].permissions.map(permission)
-    .sort((left, right) => left.action < right.action ? -1 : left.action > right.action ? 1 : 0);
-  if (new Set(permissions.map(item => item.action)).size !== permissions.length) throw invalidRequest();
-  return Object.freeze([Object.freeze({ type: 'atum', permissions: Object.freeze(permissions),
-    grant_limit: source[0].grant_limit, grant_expires_at_ms: source[0].grant_expires_at_ms })]);
+  const profile = configuredProfile ?? (source[0].permissions.some(item => item?.action === 'energy.purchase') ? MERX_ENERGY_V1 : MERX_SANDBOX_V1);
+  let grant;
+  try { grant = normalizeProfileGrant({ permissions: source[0].permissions, grant_limit: source[0].grant_limit,
+    grant_expires_at_ms: source[0].grant_expires_at_ms }, profile); } catch { throw invalidRequest(); }
+  return Object.freeze([Object.freeze({ type: 'atum', permissions: grant.permissions,
+    grant_limit: grant.grant_limit, grant_expires_at_ms: grant.grant_expires_at_ms })]);
 }
 
 function redirect(value) {
@@ -286,11 +295,11 @@ function redirect(value) {
   return value;
 }
 
-function operationInput(kind, value) {
+function operationInput(kind, value, profile) {
   const fields = kind === 'code' ? CODE_FIELDS : kind === 'device' ? DEVICE_FIELDS : REFRESH_FIELDS;
   const source = record(value, fields, invalidRequest);
   if (Reflect.ownKeys(source).length !== fields.size) throw invalidRequest();
-  const expected = authorizationDetails(source.expected_authorization_details);
+  const expected = authorizationDetails(source.expected_authorization_details, profile);
   if (kind === 'code') {
     if (typeof source.code !== 'string' || !OPAQUE_ARTIFACT.test(source.code)
         || !canonicalBase64(source.code_verifier, 32)) throw invalidRequest();
@@ -353,7 +362,7 @@ function oauthError(response, kind) {
   return null;
 }
 
-function successful(response, expected, submittedRefresh) {
+function successful(response, expected, submittedRefresh, profile) {
   const body = response.body;
   if (response.status !== 200 || !exact(body, SUCCESS_FIELDS) || body.token_type !== 'DPoP'
       || body.scope !== 'atum:invoke' || !integer(body.expires_in, 1, 60)
@@ -361,7 +370,7 @@ function successful(response, expected, submittedRefresh) {
       || typeof body.refresh_token !== 'string' || !OPAQUE_ARTIFACT.test(body.refresh_token)
       || (submittedRefresh !== null && body.refresh_token === submittedRefresh)) throw unavailable();
   let returned;
-  try { returned = authorizationDetails(body.authorization_details); } catch { throw unavailable(); }
+  try { returned = authorizationDetails(body.authorization_details, profile); } catch { throw unavailable(); }
   if (canonical(returned) !== canonical(expected)) throw unavailable();
   return snapshotData({ token_type: body.token_type, access_token: body.access_token, expires_in: body.expires_in,
     refresh_token: body.refresh_token, scope: body.scope, authorization_details: returned });
@@ -389,7 +398,7 @@ export function createTokenClient(config) {
     let liveClock;
     let maximumUpper = -1;
     try {
-      captured = operationInput(kind, input);
+      captured = operationInput(kind, input, saved.profile);
       captured.form.set('client_id', saved.client_id);
       liveClock = () => {
         const measured = readClock();
@@ -442,7 +451,7 @@ export function createTokenClient(config) {
           if (secondError?.error) throw secondError.error;
           if (secondError?.result) return finish(null, secondError.result);
           if (secondError?.challenge) throw unavailable();
-          finish(null, successful(second, captured.expected, captured.submittedRefresh));
+          finish(null, successful(second, captured.expected, captured.submittedRefresh, saved.profile));
         } catch (error) { finish(error); }
       })();
     });

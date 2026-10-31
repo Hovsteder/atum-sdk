@@ -24,9 +24,10 @@ function certificates() {
   return { dir, ca: readFileSync(path.join(dir, 'ca.pem'), 'utf8'), cert: readFileSync(path.join(dir, 'client.pem'), 'utf8'), key: readFileSync(path.join(dir, 'client.key'), 'utf8'), serverCert: readFileSync(path.join(dir, 'server.pem')), serverKey: readFileSync(path.join(dir, 'server.key')) };
 }
 
-async function host(handler) {
+async function host(handler, { mtls = true } = {}) {
   const certs = certificates();
-  const server = https.createServer({ cert: certs.serverCert, key: certs.serverKey, ca: certs.ca, requestCert: true, rejectUnauthorized: true }, handler);
+  const server = https.createServer({ cert: certs.serverCert, key: certs.serverKey,
+    ...(mtls ? { ca: certs.ca, requestCert: true, rejectUnauthorized: true } : {}) }, handler);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   const port = server.address().port;
   return { certs, url: `https://localhost:${port}`, close: async () => { await new Promise(resolve => server.close(resolve)); rmSync(certs.dir, { recursive: true, force: true }); } };
@@ -51,6 +52,21 @@ test('resource client uses mTLS, binds exact routes, and snapshots input', async
   const input = structuredClone(baseInput); const pending = client.snapshot(input);
   input.client_id = 'changed'; input.context.tenant_id = 'changed';
   assert.equal(await pending, 'a.b.c'); assert.equal(seen, 1);
+  await client.close();
+});
+
+test('service credential uses the separate HTTPS authority routes without a client certificate', async (t) => {
+  const credential = `atum_svc_${Buffer.alloc(32, 7).toString('base64url')}`;
+  const h = await host((req, res) => {
+    assert.equal(req.socket.authorized, false);
+    assert.equal(req.headers.authorization, `Bearer ${credential}`);
+    assert.equal(req.url, '/v1/service/authority/grant-snapshot');
+    req.resume(); req.on('end', () => respond(res, 200, JSON.stringify({ assertion: 'a.b.c' })));
+  }, { mtls: false });
+  t.after(h.close);
+  const client = createResourceClient({ baseUrl: h.url, registration: fixture.registration,
+    https: { ca: h.certs.ca }, serviceCredential: credential, timeoutMs: 500, maxConcurrent: 1 });
+  assert.equal(await client.snapshot(baseInput), 'a.b.c');
   await client.close();
 });
 

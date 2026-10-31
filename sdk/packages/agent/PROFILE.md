@@ -1,6 +1,6 @@
 # Registered ATUM Agent Profile
 
-This is the integration contract for the developer-preview `@atum/agent` package. It
+This is the integration contract for the unreleased `@atum/agent` package. It
 describes the implemented sandbox profile verified on Node.js 22.12 or newer.
 It is not discovery metadata and does not define a new wire protocol.
 
@@ -11,8 +11,8 @@ fixed issuer endpoints, issuer CA bundle, P-256 signing port, and measured
 clock. Treat them as configuration. Never accept replacements from a callback,
 token response, environment proxy, or arbitrary URL argument.
 
-Install this preview through the repository workspace. npm registry publication
-and production deployment are separate milestones.
+The package is private and is not published to npm. Workspace consumers use the
+repository package directly. Production distribution remains open.
 
 ## Exact configuration
 

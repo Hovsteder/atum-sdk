@@ -1,0 +1,59 @@
+{
+  "descriptor": {
+    "profile": "atum.service-actions.v1-draft.1",
+    "actions": [
+      "calendar.event.read",
+      "document.read",
+      "storage.object.write"
+    ],
+    "account_required_actions": [
+      "storage.object.write"
+    ]
+  },
+  "canonical_descriptor": "{\"account_required_actions\":[\"storage.object.write\"],\"actions\":[\"calendar.event.read\",\"document.read\",\"storage.object.write\"],\"profile\":\"atum.service-actions.v1-draft.1\"}",
+  "descriptor_hash": "sha256:6c4f1bbc3b6ed1b3863049bb467868bbd13c58edf734e4a6bcd48b15002fce8b",
+  "actions": [
+    {
+      "request": {
+        "action": "calendar.event.read",
+        "parameters": {
+          "limit": 25,
+          "include_cancelled": false,
+          "calendar_id": "main"
+        }
+      },
+      "canonical": "{\"action\":\"calendar.event.read\",\"parameters\":{\"calendar_id\":\"main\",\"include_cancelled\":false,\"limit\":25}}",
+      "hash": "sha256:e3c7c83d66eea0c0df2317d89e003d327c28b828531ad33818ab634bba385b60"
+    },
+    {
+      "request": {
+        "action": "document.read",
+        "parameters": {
+          "by_id": {
+            "2": "two",
+            "10": "ten"
+          }
+        }
+      },
+      "canonical": "{\"action\":\"document.read\",\"parameters\":{\"by_id\":{\"10\":\"ten\",\"2\":\"two\"}}}",
+      "hash": "sha256:06587bf4a8b6586c667a902977d4005804100946b71c6f4355966e48b2afd0ae"
+    },
+    {
+      "request": {
+        "action": "storage.object.write",
+        "parameters": {
+          "size": 42,
+          "metadata": {
+            "owner": "Антон"
+          },
+          "labels": [
+            "α",
+            "β"
+          ]
+        }
+      },
+      "canonical": "{\"action\":\"storage.object.write\",\"parameters\":{\"labels\":[\"α\",\"β\"],\"metadata\":{\"owner\":\"Антон\"},\"size\":42}}",
+      "hash": "sha256:85d313a2c3701691a7809e8267dc3c77603c9c557007250d667ec486a99f6958"
+    }
+  ]
+}

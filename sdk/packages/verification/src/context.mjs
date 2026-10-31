@@ -1,14 +1,24 @@
 import { createHash } from 'node:crypto';
 import { visit } from 'jsonc-parser';
+import {
+  MERX_ENERGY_V1,
+  MERX_SANDBOX_V1,
+  GENERIC_SERVICE_PROFILE,
+  canonicalServiceAction,
+  createServiceProfile,
+  normalizeProfileAction,
+  selectResourceProfile,
+  validateResourceRegistration,
+} from './resource-profiles.mjs';
 
 const MAX_SAFE_INT = Number.MAX_SAFE_INTEGER;
-const PROFILE_HASH = 'sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175';
 const PROTOCOL_VERSION = '0.1.0-draft.2';
 const ID_RE = /^[A-Za-z0-9._:-]{1,128}(?![\s\S])/;
 const PARTY_RE = /^[A-Za-z0-9:/._-]{1,256}(?![\s\S])/;
 const HASH_RE = /^sha256:[0-9a-f]{64}(?![\s\S])/;
 const BASE64URL_43_RE = /^[A-Za-z0-9_-]{43}(?![\s\S])/;
-const KNOWN_ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute']);
+const KNOWN_ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute', 'energy.purchase']);
+const SERVICE_ACTION_RE = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*(?![\s\S])/;
 const CONTEXT_FIELDS = new Set([
   'protocol_version', 'resource_profile_version', 'resource_profile_hash', 'issuer', 'audience',
   'environment', 'tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace',
@@ -64,36 +74,24 @@ function hash(domain, canonical) {
   return `sha256:${createHash('sha256').update(domain, 'ascii').update(canonical, 'utf8').digest('hex')}`;
 }
 
-function validateAction(request) {
-  exactObject(request, new Set(['action', 'parameters']));
-  if (typeof request.action !== 'string' || !KNOWN_ACTIONS.has(request.action)) invalid();
-  if (!isPlainObject(request.parameters)) invalid();
-  if (request.action === 'prices.read') {
-    if (Object.keys(request.parameters).length !== 0) invalid();
-    return { action: request.action, parameters: {} };
-  }
-  const allowed = new Set(['resource', 'amount', 'duration', 'max_price_sun']);
-  const keys = Object.keys(request.parameters);
-  if (!['resource', 'amount', 'duration'].every((key) => Object.hasOwn(request.parameters, key))
-      || keys.some((key) => !allowed.has(key))) invalid();
-  if (request.parameters.resource !== 'ENERGY' && request.parameters.resource !== 'BANDWIDTH') invalid();
-  const parameters = {
-    resource: request.parameters.resource,
-    amount: integral(request.parameters.amount, 1, 1_000_000_000),
-    duration: integral(request.parameters.duration, 1, 2_592_000),
-  };
-  if (Object.hasOwn(request.parameters, 'max_price_sun')) {
-    parameters.max_price_sun = integral(request.parameters.max_price_sun, 1, 1_000_000_000_000);
-  }
-  return { action: request.action, parameters };
+function validateAction(request, descriptor) {
+  try {
+    if (descriptor !== undefined) return normalizeProfileAction(request, createServiceProfile(descriptor));
+    return normalizeProfileAction(request, request?.action === 'energy.purchase' ? MERX_ENERGY_V1 : MERX_SANDBOX_V1);
+  } catch { invalid(); }
 }
 
-function validateContext(context) {
+function validateContext(context, descriptor) {
   exactObject(context, CONTEXT_FIELDS);
-  if (context.protocol_version !== PROTOCOL_VERSION
-      || context.resource_profile_version !== 'v1-draft.1'
-      || context.resource_profile_hash !== PROFILE_HASH
-      || context.environment !== 'sandbox') invalid();
+  if (context.protocol_version !== PROTOCOL_VERSION) invalid();
+  let profile;
+  const generic = context.resource_profile_version === GENERIC_SERVICE_PROFILE;
+  try {
+    if (generic && descriptor === undefined) {
+      if (!['sandbox', 'production'].includes(context.environment)) invalid();
+      string(context.resource_profile_hash, HASH_RE);
+    } else profile = selectResourceProfile(context, descriptor);
+  } catch { invalid(); }
   string(context.issuer, PARTY_RE);
   string(context.audience, PARTY_RE);
   for (const field of ['tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace', 'scoped_subject', 'operation_id', 'grant_id', 'policy_version']) {
@@ -103,10 +101,13 @@ function validateContext(context) {
   base64url32(context.agent_key_thumbprint);
   string(context.consent_hash, HASH_RE);
   string(context.action_hash, HASH_RE);
-  if (typeof context.action !== 'string' || !KNOWN_ACTIONS.has(context.action)) invalid();
+  if (typeof context.action !== 'string'
+      || (generic ? !SERVICE_ACTION_RE.test(context.action) || (profile && !profile.actions.includes(context.action))
+        : !KNOWN_ACTIONS.has(context.action) || !profile.actions.includes(context.action))) invalid();
   let accountVersion;
   if (context.account_binding_id === null) {
     if (context.account_binding_version !== null) invalid();
+    if (context.action === 'energy.purchase') invalid();
     accountVersion = null;
   } else {
     string(context.account_binding_id, ID_RE);
@@ -181,9 +182,11 @@ export function parseStrictJson(input, maxBytes = 32768) {
   return parsed;
 }
 
-export function canonicalAction(request) {
-  const action = validateAction(request);
+export function canonicalAction(request, descriptor) {
+  const action = validateAction(request, descriptor);
+  if (descriptor !== undefined) return canonicalServiceAction(action, descriptor);
   if (action.action === 'prices.read') return '{"action":"prices.read","parameters":{}}';
+  if (action.action === 'energy.purchase') return JSON.stringify({ action: action.action, parameters: Object.fromEntries(Object.keys(action.parameters).sort().map(key => [key, action.parameters[key]])) });
   const parameters = {};
   for (const key of ['amount', 'duration', 'max_price_sun', 'resource']) {
     if (Object.hasOwn(action.parameters, key)) parameters[key] = action.parameters[key];
@@ -191,32 +194,31 @@ export function canonicalAction(request) {
   return JSON.stringify({ action: action.action, parameters });
 }
 
-export function actionHash(request) {
-  return hash('merx.atum.intent.v1\n', canonicalAction(request));
+export function actionHash(request, descriptor) {
+  return hash(descriptor === undefined ? 'merx.atum.intent.v1\n' : 'atum.service.action.v1\n', canonicalAction(request, descriptor));
 }
 
-export function canonicalContext(context) {
-  const normalized = validateContext(context);
+export function canonicalContext(context, descriptor) {
+  const normalized = validateContext(context, descriptor);
   const ordered = {};
   for (const key of Object.keys(normalized).sort()) ordered[key] = normalized[key];
   return JSON.stringify(ordered);
 }
 
-export function intentHash(context) {
-  return hash('atum.admission.context.v1\n', canonicalContext(context));
+export function intentHash(context, descriptor) {
+  return hash('atum.admission.context.v1\n', canonicalContext(context, descriptor));
 }
 
-export function validateBoundIntent(context, request, registration) {
-  const normalized = validateContext(context);
-  const action = validateAction(request);
-  exactObject(registration, REGISTRATION_FIELDS);
+export function validateBoundIntent(context, request, registration, descriptor) {
+  const normalized = validateContext(context, descriptor);
+  let selected;
+  try { selected = validateResourceRegistration(registration, descriptor); } catch { invalid(); }
+  const action = (() => { try { return normalizeProfileAction(request, selected.profile); } catch { invalid(); } })();
   for (const field of REGISTRATION_FIELDS) {
     if (field !== 'account_required_actions' && registration[field] !== normalized[field]) invalid();
   }
-  const required = registration.account_required_actions;
-  if (!Array.isArray(required) || required.some((item) => typeof item !== 'string' || !KNOWN_ACTIONS.has(item))
-      || new Set(required).size !== required.length) invalid();
-  if (action.action !== normalized.action || actionHash(request) !== normalized.action_hash) invalid();
+  const required = selected.registration.account_required_actions;
+  if (action.action !== normalized.action || actionHash(request, descriptor) !== normalized.action_hash) invalid();
   if (required.includes(normalized.action) && normalized.account_binding_id === null) invalid();
 }
 

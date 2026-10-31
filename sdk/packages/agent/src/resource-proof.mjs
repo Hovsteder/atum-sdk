@@ -1,13 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { canonicalAction, canonicalContext, intentHash, validateBoundIntent } from '@atum/verification/context';
+import { validateResourceRegistration } from '@atum/verification/resource-profiles';
 
 import { AgentError, agentKeyTimeout, assertAgentKey } from './key.mjs';
 import { canonical, snapshotData } from './strict.mjs';
 
 const MAX_TIME = 8_640_000_000_000_000;
 const MAX_TOKEN_BYTES = 16 * 1024;
-const CONFIG_FIELDS = new Set(['key', 'registration', 'endpoint', 'clock', 'timeoutMs']);
+const CONFIG_FIELDS = new Set(['key', 'registration', 'descriptor', 'endpoint', 'clock', 'timeoutMs']);
 const REGISTRATION_FIELDS = new Set(['issuer', 'audience', 'environment', 'tenant_id', 'resource_id', 'quota_scope_id',
   'operation_namespace', 'resource_profile_version', 'resource_profile_hash', 'policy_version', 'account_required_actions']);
 const ENDPOINT_FIELDS = new Set(['method', 'url']);
@@ -18,7 +19,7 @@ const BASE64URL_32 = /^[A-Za-z0-9_-]{43}(?![\s\S])/;
 const PARTY = /^[A-Za-z0-9:/._-]{1,256}(?![\s\S])/;
 const ID = /^[A-Za-z0-9._:-]{1,128}(?![\s\S])/;
 const HASH = /^sha256:[0-9a-f]{64}(?![\s\S])/;
-const ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute']);
+const ACTIONS = new Set(['prices.read', 'order.preview', 'sandbox.execute', 'energy.purchase']);
 
 function unavailable() { return new AgentError('temporarily_unavailable'); }
 function invalidRequest() { throw new AgentError('invalid_request'); }
@@ -59,33 +60,26 @@ function configuredEndpoint(value) {
   return Object.freeze({ method: source.method, url: source.url });
 }
 
-function configuredRegistration(value) {
+function configuredRegistration(value, descriptor) {
   let copy;
   try { copy = snapshotData(value); } catch { invalidConfig(); }
   const source = record(copy, REGISTRATION_FIELDS, invalidConfig);
-  if (Reflect.ownKeys(source).length !== REGISTRATION_FIELDS.size
-      || typeof source.issuer !== 'string' || !PARTY.test(source.issuer)
-      || typeof source.audience !== 'string' || !PARTY.test(source.audience)
-      || source.environment !== 'sandbox' || source.resource_profile_version !== 'v1-draft.1'
-      || typeof source.resource_profile_hash !== 'string' || !HASH.test(source.resource_profile_hash)
-      || ['tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace', 'policy_version']
-        .some(field => typeof source[field] !== 'string' || !ID.test(source[field]))
-      || !Array.isArray(source.account_required_actions)
-      || source.account_required_actions.some(action => typeof action !== 'string' || !ACTIONS.has(action))
-      || new Set(source.account_required_actions).size !== source.account_required_actions.length) invalidConfig();
-  return copy;
+  if (Reflect.ownKeys(source).length !== REGISTRATION_FIELDS.size) invalidConfig();
+  try { return validateResourceRegistration(copy, descriptor).registration; } catch { invalidConfig(); }
 }
 
 function configuration(value) {
   const source = record(value, CONFIG_FIELDS, invalidConfig);
   if (!['key', 'registration', 'endpoint', 'clock'].every(field => Object.hasOwn(source, field))
-      || (Reflect.ownKeys(source).length !== 4 && Reflect.ownKeys(source).length !== 5)
+      || Reflect.ownKeys(source).length < 4 || Reflect.ownKeys(source).length > 6
       || typeof source.clock !== 'function') invalidConfig();
   let key;
   try { key = assertAgentKey(source.key); } catch { invalidConfig(); }
   const timeoutMs = Object.hasOwn(source, 'timeoutMs') ? source.timeoutMs : 5000;
   if (!integer(timeoutMs, 1, 5000)) invalidConfig();
-  return Object.freeze({ key, registration: configuredRegistration(source.registration),
+  let descriptor;
+  try { descriptor = Object.hasOwn(source, 'descriptor') ? snapshotData(source.descriptor) : undefined; } catch { invalidConfig(); }
+  return Object.freeze({ key, registration: configuredRegistration(source.registration, descriptor), descriptor,
     endpoint: configuredEndpoint(source.endpoint), clock: source.clock, timeoutMs });
 }
 
@@ -110,14 +104,14 @@ function input(value, challenge, saved) {
   if (Reflect.ownKeys(source).length !== fields.size || (!challenge && !canonicalNonce(source.nonce))) invalidRequest();
   const token = accessToken(source.access_token);
   try {
-    validateBoundIntent(source.context, source.action_request, saved.registration);
+    validateBoundIntent(source.context, source.action_request, saved.registration, saved.descriptor);
     if (source.context.agent_key_thumbprint !== saved.key.thumbprint) invalidRequest();
   } catch (error) {
     if (error instanceof AgentError) throw error;
     invalidRequest();
   }
-  const context = canonicalContext(source.context);
-  const action = canonicalAction(source.action_request);
+  const context = canonicalContext(source.context, saved.descriptor);
+  const action = canonicalAction(source.action_request, saved.descriptor);
   return Object.freeze({ token, context: source.context, action_request: source.action_request,
     body: `{"context":${context},"action_request":${action}}`, nonce: challenge ? null : source.nonce });
 }
@@ -175,7 +169,7 @@ export function createProtectedRequestSigner(config) {
           const iat = Math.floor(measured.now / 1000);
           const header = { alg: 'ES256', jwk: saved.key.publicJwk, typ: 'dpop+jwt' };
           const claims = { ath: createHash('sha256').update(captured.token, 'ascii').digest('base64url'),
-            atum_intent_hash: intentHash(captured.context), htm: saved.endpoint.method, htu: saved.endpoint.url,
+            atum_intent_hash: intentHash(captured.context, saved.descriptor), htm: saved.endpoint.method, htu: saved.endpoint.url,
             iat, jti: randomBytes(16).toString('base64url') };
           if (!challenge) claims.nonce = captured.nonce;
           const protectedHeader = compactPart(header);

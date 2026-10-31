@@ -9,9 +9,11 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { AgentError, createAgentKey, createRequestProofClient } from '../src/index.mjs';
+import { hashServiceDescriptor } from '@atum/verification/service-profile';
 import { canonical } from '../src/strict.mjs';
 
 const vector = JSON.parse(readFileSync(new URL('../../../protocol/owner-consent/owner-consent-v1.json', import.meta.url)));
+const serviceVectors = JSON.parse(readFileSync(new URL('../../../protocol/resource-profiles/atum.service-actions.v1-draft.1.vectors.json', import.meta.url)));
 const privateJwk = vector.test_private_jwk;
 const publicJwk = { kty: privateJwk.kty, crv: privateJwk.crv, x: privateJwk.x, y: privateJwk.y };
 const privateKey = createPrivateKey({ key: privateJwk, format: 'jwk' });
@@ -97,7 +99,46 @@ function config(h, key, extra = {}) {
   return { registration, client, endpoints: endpoints(h.origin), tls: { ca: h.certs.ca }, key,
     clock: () => ({ healthy: true, now_ms: NOW, uncertainty_ms: 0 }), timeoutMs: 500, maxConcurrent: 2, ...extra };
 }
+
+test('device-only client needs no fabricated redirect URI', async () => {
+  const h = await host((_req, res) => json(res, 503, { error: 'unused' }));
+  const base = config(h, await agentKey());
+  const client = createRequestProofClient({ ...base, client: { ...base.client, flows: ['device_code'], redirect_uris: [] } });
+  const systemTrust = createRequestProofClient({ ...base, tls: {},
+    client: { ...base.client, flows: ['device_code'], redirect_uris: [] } });
+  await client.close(); await systemTrust.close(); await h.close();
+});
 function expectCode(code) { return error => error instanceof AgentError && error.code === code; }
+
+test('generic Agent request proof uses only its trusted descriptor and named permission', async t => {
+  const descriptor = { ...serviceVectors.descriptor,
+    actions: [...serviceVectors.descriptor.actions, 'mail.message.send'].sort() };
+  const descriptorHash = hashServiceDescriptor(descriptor);
+  const h = await host(async (req, res) => {
+    const body = await requestBody(req);
+    const registration = { ...vector.registry.registration, issuer: h.origin, audience: 'https://calendar.example',
+      tenant_id: 'calendar', resource_id: 'calendar-api', quota_scope_id: 'owner', operation_namespace: 'calendar-operations',
+      resource_profile_version: descriptor.profile, resource_profile_hash: descriptorHash,
+      account_required_actions: descriptor.account_required_actions };
+    if (req.url.endsWith('/options')) return json(res, 200, preparedResponse(body, registration));
+    return json(res, 200, verifyResponse(h.prepared));
+  });
+  t.after(h.close);
+  const registration = { ...vector.registry.registration, issuer: h.origin, audience: 'https://calendar.example',
+    tenant_id: 'calendar', resource_id: 'calendar-api', quota_scope_id: 'owner', operation_namespace: 'calendar-operations',
+    resource_profile_version: descriptor.profile, resource_profile_hash: descriptorHash,
+    account_required_actions: descriptor.account_required_actions };
+  const clientConfig = config(h, await agentKey(), { registration, descriptor,
+    client: { ...vector.registry.clients[0], permissions: descriptor.actions } });
+  const client = createRequestProofClient(clientConfig);
+  const request = { ...input('device_code'), permissions: descriptor.actions.map(action => ({ action })) };
+  h.prepared = preparedResponse(expectedOptionsBody(request, registration, clientConfig.client), registration);
+  const result = await client.prepare(request);
+  assert.deepEqual(result.request.permissions, descriptor.actions.map(action => ({ action })));
+  await client.close();
+  assert.throws(() => createRequestProofClient({ ...clientConfig, descriptor: { ...serviceVectors.descriptor,
+    actions: [...descriptor.actions, 'tasks.read'].sort() } }), TypeError);
+});
 
 test('real TLS request preparation compares options before signing and returns only frozen correlations', async t => {
   const seen = [];
@@ -127,6 +168,7 @@ test('real TLS request preparation compares options before signing and returns o
     value.permissions[0].action = 'changed'; value.grant_limit = 999;
     const result = await pending;
     assert.equal(result.request.flow, flow); assert.equal(result.atum_request, HANDLE); assert.equal(result.request_hash, hash('atum.oauth.request.v1\n', result.request));
+    assert.deepEqual(result.request.registration.account_required_actions, ['order.preview', 'prices.read']);
     assert.equal(result.expires_at_ms, result.request.expires_at_ms); assert.equal(Object.isFrozen(result), true); assert.equal(Object.isFrozen(result.request.registration), true);
     assert.deepEqual(seen.at(-2)[1], expectedOptionsBody(expected, profile(h.origin).registration, profile(h.origin).client));
   }

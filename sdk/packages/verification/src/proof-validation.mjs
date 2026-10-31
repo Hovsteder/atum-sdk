@@ -3,6 +3,7 @@ import { calculateJwkThumbprint, importJWK, jwtVerify } from 'jose';
 
 import { intentHash, parseStrictJson, validateBoundIntent } from './context.mjs';
 import { VerificationError } from './errors.mjs';
+import { validateResourceRegistration } from './resource-profiles.mjs';
 
 const B64_INVALID = /[^A-Za-z0-9_-]/;
 const ID_INVALID = /[^A-Za-z0-9._:-]/;
@@ -69,12 +70,9 @@ function readClock(clock) {
   if (!exact(value, new Set(['now_ms', 'uncertainty_ms', 'healthy'])) || !integer(value.now_ms) || !integer(value.uncertainty_ms) || value.uncertainty_ms > 1000 || value.healthy !== true || value.now_ms > Number.MAX_SAFE_INTEGER - value.uncertainty_ms || value.now_ms + value.uncertainty_ms > 8640000000000000) unavailable();
   return { now: value.now_ms, upper: value.now_ms + value.uncertainty_ms };
 }
-function registrationConfig(value) {
-  if (!exact(value, REGISTRATION_FIELDS) || !chars(value.issuer, /[^A-Za-z0-9:/._-]/, 1, 256) || !chars(value.audience, /[^A-Za-z0-9:/._-]/, 1, 256)
-      || value.environment !== 'sandbox' || value.resource_profile_version !== 'v1-draft.1' || !sha256(value.resource_profile_hash)
-      || ['tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace', 'policy_version'].some(key => !chars(value[key], ID_INVALID, 1, 128))
-      || !Array.isArray(value.account_required_actions) || value.account_required_actions.some(action => !['prices.read', 'order.preview', 'sandbox.execute'].includes(action)) || new Set(value.account_required_actions).size !== value.account_required_actions.length) throw new TypeError('invalid config');
-  return freezeCopy(structuredClone(value));
+function registrationConfig(value, descriptor) {
+  if (!exact(value, REGISTRATION_FIELDS)) throw new TypeError('invalid config');
+  try { return validateResourceRegistration(value, descriptor).registration; } catch { throw new TypeError('invalid config'); }
 }
 function tokenTimes(claims, clock) {
   return integer(claims.iat) && integer(claims.exp) && (!Object.hasOwn(claims, 'nbf') || integer(claims.nbf))
@@ -101,10 +99,15 @@ function checkDeadline(deadlineAt) {
 }
 
 export async function createProofValidator(config) {
-  if (!exact(config, new Set(['registration', 'issuerKeys', 'endpoint', 'clock'])) || typeof config.clock !== 'function' || !Array.isArray(config.issuerKeys) || !config.issuerKeys.length) throw new TypeError('invalid config');
+  const configFields = new Set(['registration', 'issuerKeys', 'endpoint', 'clock']);
+  if (Object.hasOwn(config ?? {}, 'descriptor')) configFields.add('descriptor');
+  if (!exact(config, configFields) || typeof config.clock !== 'function' || !Array.isArray(config.issuerKeys) || !config.issuerKeys.length) throw new TypeError('invalid config');
   const endpoint = endpointConfig(config.endpoint);
-  let registration;
-  try { registration = registrationConfig(config.registration); } catch (error) { if (error instanceof TypeError) throw error; throw new TypeError('invalid config'); }
+  let registration; let descriptor;
+  try {
+    descriptor = Object.hasOwn(config, 'descriptor') ? freezeCopy(structuredClone(config.descriptor)) : undefined;
+    registration = registrationConfig(config.registration, descriptor);
+  } catch (error) { if (error instanceof TypeError) throw error; throw new TypeError('invalid config'); }
   const clock = config.clock;
   const issuerKeys = config.issuerKeys.map(issuerKey);
   if (new Set(issuerKeys.map(key => key.kid)).size !== issuerKeys.length) throw new TypeError('invalid config');
@@ -137,7 +140,7 @@ export async function createProofValidator(config) {
       const claims = verifiedToken.payload;
       if (!tokenTimes(claims, tokenClock) || claims.iss !== registration.issuer || claims.aud !== registration.audience || typeof claims.sub !== 'string' || !chars(claims.client_id, ID_INVALID, 1, 128) || !chars(claims.jti, ID_INVALID, 1, 128) || claims.scope !== 'atum:invoke') invalid();
       let body;
-      try { body = parseStrictJson(request.body, 32768); if (!exact(body, new Set(['context', 'action_request']))) invalidRequest(); validateBoundIntent(body.context, body.action_request, registration); } catch (error) { if (error instanceof VerificationError) throw error; invalidRequest(); }
+      try { body = parseStrictJson(request.body, 32768); if (!exact(body, new Set(['context', 'action_request']))) invalidRequest(); validateBoundIntent(body.context, body.action_request, registration, descriptor); } catch (error) { if (error instanceof VerificationError) throw error; invalidRequest(); }
       const context = freezeCopy(structuredClone(body.context));
       if (claims.sub !== context.scoped_subject || !exact(claims.cnf, new Set(['jkt'])) || claims.cnf.jkt !== context.agent_key_thumbprint || !exact(claims.atum, ATUM_FIELDS) || claims.atum.proof_profile !== 'atum-dpop-v1-draft.1' || !same(claims.atum, context, CONTEXT_ATUM_FIELDS)) invalid();
       const proofDecoded = compact(request.dpop, 8192, { header: 4096, payload: 8192 });
@@ -151,14 +154,14 @@ export async function createProofValidator(config) {
       if (!exact(proofDecoded.payload, fields)) invalid();
       const proof = (await jwtVerify(request.dpop, agentKey, { algorithms: ['ES256'], typ: 'dpop+jwt', currentDate: new Date(initialClock.upper), clockTolerance: 0 })).payload;
       const proofClock = afterCrypto();
-      if (!tokenTimes(claims, proofClock) || !proofTimes(proof, proofClock) || !chars(proof.jti, B64_INVALID, 16, 128) || proof.htm !== endpoint.method || proof.htu !== endpoint.url || proof.ath !== createHash('sha256').update(request.token, 'ascii').digest('base64url') || proof.atum_intent_hash !== intentHash(context)) invalid();
+      if (!tokenTimes(claims, proofClock) || !proofTimes(proof, proofClock) || !chars(proof.jti, B64_INVALID, 16, 128) || proof.htm !== endpoint.method || proof.htu !== endpoint.url || proof.ath !== createHash('sha256').update(request.token, 'ascii').digest('base64url') || proof.atum_intent_hash !== intentHash(context, descriptor)) invalid();
       if (fields.has('nonce')) canonicalB64(proof.nonce, 32);
       const finalClock = readClock(clock);
       if (finalClock.now < previousClock.now) unavailable();
       maximumUpper = Math.max(maximumUpper, finalClock.upper);
       const finalFreshness = observeEachCrypto ? { now: finalClock.now, upper: maximumUpper } : finalClock;
       if (!tokenTimes(claims, finalFreshness) || !proofTimes(proof, finalFreshness)) invalid();
-      return Object.freeze({ context, endpoint_url: endpoint.url, intent_hash: intentHash(context), agent_key_thumbprint: context.agent_key_thumbprint,
+      return Object.freeze({ context, endpoint_url: endpoint.url, intent_hash: intentHash(context, descriptor), agent_key_thumbprint: context.agent_key_thumbprint,
         proof_jti: proof.jti, proof_iat_ms: proof.iat * 1000, replay_expires_at_ms: proof.iat * 1000 + 61000,
         token_expires_at_ms: claims.exp * 1000, client_id: claims.client_id, nonce: proof.nonce, initialClock, finalClock, maximumUpper, claims, proof });
     } catch (error) {

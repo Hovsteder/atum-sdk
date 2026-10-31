@@ -1,6 +1,6 @@
 {
   "name": "@atum/verification",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -10,8 +10,15 @@
     "./nonce-challenge": "./src/nonce-challenge.mjs",
     "./context": "./src/context.mjs",
     "./authority": "./src/authority.mjs",
+    "./current-authorization": {
+      "types": "./src/current-authorization.d.ts",
+      "default": "./src/current-authorization.mjs"
+    },
     "./resource-client": "./src/resource-client.mjs",
-    "./owner-connector-client": "./src/owner-connector-client.mjs"
+    "./owner-connector-client": "./src/owner-connector-client.mjs",
+    "./resource-profiles": "./src/resource-profiles.mjs",
+    "./service-profile": "./src/service-profile.mjs",
+    "./merx-compat": "./src/merx-compat.mjs"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"

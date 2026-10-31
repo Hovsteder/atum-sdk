@@ -6,7 +6,9 @@ export type AgentErrorCode =
   | 'expired_token'
   | 'temporarily_unavailable';
 
-export type AgentAction = 'prices.read' | 'order.preview' | 'sandbox.execute';
+export type LegacyAgentAction = 'prices.read' | 'order.preview' | 'sandbox.execute' | 'energy.purchase';
+export type ServiceActionName = string;
+export type AgentAction = LegacyAgentAction | ServiceActionName;
 export type AgentFlow = 'authorization_code' | 'device_code';
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -53,19 +55,45 @@ export interface AgentClockReading {
 
 export type AgentClock = () => AgentClockReading;
 
-export interface AgentRegistration {
+export interface AgentRegistrationFields {
   readonly issuer: string;
   readonly audience: string;
-  readonly environment: 'sandbox';
   readonly tenant_id: string;
   readonly resource_id: string;
   readonly quota_scope_id: string;
   readonly operation_namespace: string;
+  readonly policy_version: string;
+}
+
+export interface SandboxAgentRegistration extends AgentRegistrationFields {
+  readonly environment: 'sandbox';
   readonly resource_profile_version: 'v1-draft.1';
   readonly resource_profile_hash: 'sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175';
-  readonly policy_version: string;
-  readonly account_required_actions: ReadonlyArray<AgentAction>;
+  readonly account_required_actions: ReadonlyArray<'prices.read' | 'order.preview' | 'sandbox.execute'>;
 }
+
+export interface EnergyAgentRegistration extends AgentRegistrationFields {
+  readonly environment: 'production';
+  readonly resource_profile_version: 'merx.energy-purchase.v1-draft.1';
+  readonly resource_profile_hash: 'sha256:e1c5106dc710ce0ba3d846f3cb376358eb858c35adfbac906f0ff58f3a6451fa';
+  readonly account_required_actions: ReadonlyArray<'prices.read' | 'order.preview' | 'energy.purchase'>;
+}
+
+export interface ServiceActionDescriptor {
+  readonly profile: 'atum.service-actions.v1-draft.1';
+  readonly actions: ReadonlyArray<ServiceActionName>;
+  readonly account_required_actions: ReadonlyArray<ServiceActionName>;
+}
+
+export interface GenericAgentRegistration extends AgentRegistrationFields {
+  readonly environment: 'sandbox' | 'production';
+  readonly resource_profile_version: 'atum.service-actions.v1-draft.1';
+  readonly resource_profile_hash: `sha256:${string}`;
+  readonly account_required_actions: ReadonlyArray<ServiceActionName>;
+}
+
+export type LegacyAgentRegistration = SandboxAgentRegistration | EnergyAgentRegistration;
+export type AgentRegistration = LegacyAgentRegistration | GenericAgentRegistration;
 
 export interface RegisteredAgentClient {
   readonly client_id: string;
@@ -86,11 +114,10 @@ export interface AgentEndpoints {
 }
 
 export interface AgentTlsConfig {
-  readonly ca: string;
+  readonly ca?: string;
 }
 
-export interface AgentConfig {
-  readonly registration: AgentRegistration;
+export interface AgentConfigFields {
   readonly client: RegisteredAgentClient;
   readonly endpoints: AgentEndpoints;
   readonly tls: AgentTlsConfig;
@@ -99,6 +126,18 @@ export interface AgentConfig {
   readonly timeoutMs?: number;
   readonly maxConcurrent?: number;
 }
+
+export interface LegacyAgentConfig extends AgentConfigFields {
+  readonly registration: LegacyAgentRegistration;
+  readonly descriptor?: never;
+}
+
+export interface GenericAgentConfig extends AgentConfigFields {
+  readonly registration: GenericAgentRegistration;
+  readonly descriptor: ServiceActionDescriptor;
+}
+
+export type AgentConfig = LegacyAgentConfig | GenericAgentConfig;
 
 /** The one field accepted for the read-only permission wire object. */
 export interface PricesReadPermission {
@@ -121,11 +160,37 @@ export type SandboxExecutePermission = BoundedAgentPermission & {
   readonly action: 'sandbox.execute';
 };
 
+export interface EnergyPurchaseParameters {
+  readonly network: 'tron-mainnet';
+  readonly resource: 'ENERGY';
+  readonly amount: number;
+  readonly duration_sec: 120 | 300 | 600 | 900 | 1800 | 3600 | 10800 | 21600 | 86400;
+  readonly recipient: string;
+  readonly execution_provider: 'powersun-merx';
+  readonly quote_id: string;
+  readonly quote_expires_at_ms: number;
+  readonly resource_cost_sun: string;
+  readonly platform_fee_sun: '0';
+  readonly activation_fee_cap_sun: string;
+  readonly network_fee_cap_sun: '0';
+  readonly max_total_debit_sun: string;
+}
+
+export interface EnergyPurchasePermission {
+  readonly action: 'energy.purchase';
+  readonly parameters: EnergyPurchaseParameters;
+}
+
+/** Neutral service permissions name one descriptor-registered action and carry no constraints. */
+export interface NamedServicePermission {
+  readonly action: ServiceActionName;
+}
+
 /**
  * Action-specific public permission shapes. Runtime checks still enforce
  * closed objects and numeric ranges for values received from callers.
  */
-export type AgentPermission = PricesReadPermission | BoundedAgentPermission;
+export type AgentPermission = PricesReadPermission | BoundedAgentPermission | EnergyPurchasePermission | NamedServicePermission;
 
 export interface AuthorizationCodeRequest {
   readonly permissions: ReadonlyArray<AgentPermission>;
@@ -159,16 +224,14 @@ export interface PreparedCodeMetadata {
   readonly state: string;
 }
 
-export interface PreparedRequestRecord {
+export interface PreparedRequestRecordFields {
   readonly profile: 'atum-oauth-request-v1';
   readonly request_id: string;
   readonly created_at_ms: number;
   readonly expires_at_ms: number;
   readonly issuer: string;
-  readonly environment: 'sandbox';
   readonly flow: AgentFlow;
   readonly client_id: string;
-  readonly registration: AgentRegistration;
   readonly resource: string;
   readonly scope: 'atum:invoke';
   readonly permissions: ReadonlyArray<AgentPermission>;
@@ -176,6 +239,23 @@ export interface PreparedRequestRecord {
   readonly grant_expires_at_ms: number;
   readonly code: PreparedCodeMetadata | null;
 }
+
+export interface SandboxPreparedRequestRecord extends PreparedRequestRecordFields {
+  readonly environment: 'sandbox';
+  readonly registration: SandboxAgentRegistration;
+}
+
+export interface EnergyPreparedRequestRecord extends PreparedRequestRecordFields {
+  readonly environment: 'production';
+  readonly registration: EnergyAgentRegistration;
+}
+
+export interface GenericPreparedRequestRecord extends PreparedRequestRecordFields {
+  readonly environment: 'sandbox' | 'production';
+  readonly registration: GenericAgentRegistration;
+}
+
+export type PreparedRequestRecord = SandboxPreparedRequestRecord | EnergyPreparedRequestRecord | GenericPreparedRequestRecord;
 
 export interface PreparedOwnerRequest {
   readonly request: PreparedRequestRecord;
@@ -238,13 +318,10 @@ export interface ProtectedResourceEndpoint {
   readonly url: string;
 }
 
-export interface ResourceContext {
+export interface ResourceContextFields {
   readonly protocol_version: '0.1.0-draft.2';
-  readonly resource_profile_version: 'v1-draft.1';
-  readonly resource_profile_hash: 'sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175';
   readonly issuer: string;
   readonly audience: string;
-  readonly environment: 'sandbox';
   readonly tenant_id: string;
   readonly resource_id: string;
   readonly quota_scope_id: string;
@@ -259,8 +336,30 @@ export interface ResourceContext {
   readonly action_hash: string;
   readonly account_binding_id: string | null;
   readonly account_binding_version: number | null;
-  readonly action: AgentAction;
 }
+
+export interface SandboxResourceContext extends ResourceContextFields {
+  readonly resource_profile_version: 'v1-draft.1';
+  readonly resource_profile_hash: 'sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175';
+  readonly environment: 'sandbox';
+  readonly action: 'prices.read' | 'order.preview' | 'sandbox.execute';
+}
+
+export interface EnergyResourceContext extends ResourceContextFields {
+  readonly resource_profile_version: 'merx.energy-purchase.v1-draft.1';
+  readonly resource_profile_hash: 'sha256:e1c5106dc710ce0ba3d846f3cb376358eb858c35adfbac906f0ff58f3a6451fa';
+  readonly environment: 'production';
+  readonly action: 'prices.read' | 'order.preview' | 'energy.purchase';
+}
+
+export interface GenericResourceContext extends ResourceContextFields {
+  readonly resource_profile_version: 'atum.service-actions.v1-draft.1';
+  readonly resource_profile_hash: `sha256:${string}`;
+  readonly environment: 'sandbox' | 'production';
+  readonly action: ServiceActionName;
+}
+
+export type ResourceContext = SandboxResourceContext | EnergyResourceContext | GenericResourceContext;
 
 export interface PricesReadActionRequest {
   readonly action: 'prices.read';
@@ -277,13 +376,21 @@ export interface BoundedResourceActionRequest {
   }>;
 }
 
-export type ResourceActionRequest = PricesReadActionRequest | BoundedResourceActionRequest;
+export interface EnergyPurchaseActionRequest extends EnergyPurchasePermission {}
+
+export interface GenericServiceActionRequest {
+  readonly action: ServiceActionName;
+  readonly parameters: JsonObject;
+}
+
+export type ResourceActionRequest = PricesReadActionRequest | BoundedResourceActionRequest | EnergyPurchaseActionRequest | GenericServiceActionRequest;
 
 export interface ProtectedRequestSignerConfig {
   readonly key: AgentKey;
   readonly registration: AgentRegistration;
   readonly endpoint: ProtectedResourceEndpoint;
   readonly clock: AgentClock;
+  readonly descriptor?: ServiceActionDescriptor;
   readonly timeoutMs?: number;
 }
 

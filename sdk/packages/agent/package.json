@@ -1,6 +1,6 @@
 {
   "name": "@atum/agent",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -36,7 +36,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@atum/verification": "0.1.0-rc.1",
+    "@atum/verification": "0.1.0-rc.2",
     "jose": "6.2.14",
     "jsonc-parser": "3.3.1"
   },
@@ -52,10 +52,10 @@
   "homepage": "https://github.com/Hovsteder/atum-sdk#readme",
   "files": [
     "src",
+    "types",
     "README.md",
     "PROFILE.md",
     "LICENSE",
-    "NOTICE",
-    "types"
+    "NOTICE"
   ]
 }

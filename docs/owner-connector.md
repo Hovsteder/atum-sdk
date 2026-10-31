@@ -1,4 +1,6 @@
-# Owner connector protocol
+# Optional account-binding connector
+
+Compatibility protocol reference for services that require a separate account binding, including MERX. The generic self-service path does not require this connector.
 
 Protocol reference for the SDK owner-connector client. Local owner authentication,
 persistence and lifecycle checks remain host responsibilities. See [release status](status.md).

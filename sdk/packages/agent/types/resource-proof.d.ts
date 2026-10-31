@@ -3,7 +3,7 @@ import type { ProtectedRequestSigner, ProtectedRequestSignerConfig } from './com
 export function createProtectedRequestSigner(config: ProtectedRequestSignerConfig): ProtectedRequestSigner;
 
 export type {
-  BoundedResourceActionRequest, PricesReadActionRequest, ProtectedRequestChallengeInput, ProtectedRequestInput,
+  BoundedResourceActionRequest, EnergyPurchaseActionRequest, GenericResourceContext, GenericServiceActionRequest, PricesReadActionRequest, ProtectedRequestChallengeInput, ProtectedRequestInput,
   ProtectedRequestSigner, ProtectedRequestSignerConfig, ProtectedResourceEndpoint, ResourceActionRequest,
-  ResourceContext, SignatureArtifact,
+  EnergyResourceContext, ResourceContext, SandboxResourceContext, ServiceActionDescriptor, SignatureArtifact,
 } from './common.js';

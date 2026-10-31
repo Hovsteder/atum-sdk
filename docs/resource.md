@@ -1,46 +1,87 @@
-# Accept ATUM agents at your service
+# Check passport and permission at your service
 
-The [verification package](../sdk/packages/verification/README.md) checks tokens,
-DPoP proofs and the complete registered context. The [PostgreSQL adapter](../sdk/packages/replay-postgres/README.md)
-provides durable nonce/replay storage. The [authority contract](../sdk/authority/CONTRACT.md)
-defines signed status, admission and retrieval semantics.
+ATUM checks an agent's connection to its owner's passport, the owner's current
+permission and the signed request. Your service performs its own operation.
+Permission names belong to your service: a calendar might register
+`calendar.event.read`; a document service might register `document.read`.
+Neither service needs MERX, Energy, order or payment fields.
 
-## Host boundaries
+## Connect an existing service
 
-Your HTTP layer must retain the raw request boundary: fixed trusted URL/method,
-strict duplicate-header and JSON checks, bounded bodies, TLS and exact client
-registration. Proxy forwarding or a generic JSON middleware must not silently
-change the bytes and identity seen by proof verification.
+Register your service's origin and action names in the [ATUM developer entry](service-registration.md).
+Use the resulting trusted registration and service access credential on your
+backend. The credential authenticates your service to ATUM. It cannot create an
+owner's permission or replace the owner's consent.
 
-The execution path is:
+A request contains a registered action name and canonical JSON parameters.
+The first generic permission format authorizes the named action. Your service
+still checks the business parameters and data ownership. For example, permission
+to read a calendar does not grant access to another owner's calendar.
+Unsupported permission restrictions are rejected; they are not silently ignored.
 
-1. Issue a bound nonce only after the nonce-omitted proof passes. A challenge does
-   not reserve business quota or authorize an effect.
-2. Verify the continued proof and atomically consume its nonce/replay identity.
-3. Verify current grant and local account/binding state and reserve common and
-   per-grant quota in your durable ledger.
-4. Obtain and verify the signed admission. Persist its exact original context,
-   decision and deadlines under your resource acceptance protocol.
-5. Claim submission once, within its original cap, and persist the result.
-6. Reconcile uncertain work through its original operation and external reference.
+Partner-account linking is a service policy. It is not mandatory for every
+integration. The first generic self-service path uses owner consent without a
+separate partner-account connection. Existing integrations that require a real
+account binding keep that requirement.
 
-No single verifier call replaces this lifecycle. `proof_verified` has
-`authorization_effect: none`; a signed snapshot permits reservation only.
-Historical retrieval cannot renew a permit or establish new read privileges.
+## Verify a request
 
-Keep authority keys and service mTLS keys in distinct configured roles. Use
-measured clock health and retain original caps through waits/transactions. Install
-migrations explicitly using dedicated database roles; do not seed accounts or
-reset quota on service startup. Bound connection acquisition, concurrency and
-error handling as described in the replay profile.
+Use `createCurrentAuthorizationVerifier` from
+`@atum/verification/current-authorization`. The composition:
 
-## Examples and verification
+1. Verifies the issued token, agent signature and complete request context.
+2. Consumes the bound nonce and replay identity through durable storage.
+3. Fetches and verifies a fresh signed grant snapshot and admission from ATUM.
+4. Returns the scoped owner subject, agent/client identity, authorized action,
+   original grant limit and original expiry deadlines.
 
-`npm run example:verify` verifies one bundled synthetic proof and rejects its
-replay using a deliberately local example store. It is an offline teaching tool,
-not an HTTP server or production authorization adapter. Production replay uses
-the PostgreSQL component and production execution needs the steps above.
+The result has `authorization_effect: 'current_permission'` and
+`requires_resource_acceptance: true`. It is permission for your service to
+consider the original request. It is not a receipt for completed business work,
+a remaining-balance counter or proof that an external action succeeded.
 
-MERX is the first integrated reference resource. Its real purchase action and
-permanent public deployment are separate from the existing simulation profile.
-The SDK preview does not provide a turnkey production resource server.
+The low-level `createVerifier` API only verifies a request proof. Its
+`authorization_effect: 'none'` result is intentionally insufficient for execution.
+Historical signed decisions are also separate from a fresh permission check.
+
+## Keep your service's rules
+
+After verification, your service checks its own data access and business rules,
+accounts for usage, and records the operation and outcome durably. Preserve the
+original identity and deadlines through queue/lock waits. Do not count different
+operation namespaces as new grants or invent a new operation ID after a timeout.
+
+The [calendar example](../sdk/examples/calendar-resource/README.md) checks calendar
+ownership using the verified scoped subject and records grant usage and local
+query results in PostgreSQL. Its local transaction is not a claim of exactly-once
+execution at an external payment/provider service.
+
+A timeout can leave the outcome uncertain. The verification composition does not
+automatically admit again or retry business work. Recovery uses your service's
+saved original operation and authorized recovery process. Public agent status/read
+permissions are not implied by invocation permission.
+
+## Host requirements
+
+Preserve the raw request body and security headers until verification. Check the
+configured HTTPS endpoint and reject ambiguous duplicate headers, JSON and
+framing. The nonce challenge checks the initial signed request before issuing a
+nonce; it does not execute work or reserve business usage.
+
+Use durable [nonce/replay storage](../sdk/packages/replay-postgres/README.md),
+bounded connections/concurrency and a healthy observed clock. Apply migrations
+explicitly. Do not seed grants, reset usage or disable TLS validation on startup.
+Keys for issuing agent tokens, signing authority decisions and authenticating a
+service have different roles. A service credential never becomes owner consent.
+
+## MERX compatibility
+
+MERX is the first reference integrator. It owns its action validators, pricing,
+accounting, provider calls, business results and recovery. Existing MERX profiles
+retain their exact hashes, permission constraints and wire formats through an
+explicit compatibility path. Generic name-only permissions do not replace an
+existing exact-quote purchase permission.
+
+See the [verification API](../sdk/packages/verification/README.md) for the concrete
+configuration and errors, and [release status](status.md) for what is published,
+tested locally and publicly hosted.

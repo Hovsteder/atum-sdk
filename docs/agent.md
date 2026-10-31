@@ -1,37 +1,41 @@
-# Build an ATUM agent
+# Connect an agent to its owner's permission
 
-Start with the [Agent API](../sdk/packages/agent/README.md) and
-[exact configuration](../sdk/packages/agent/PROFILE.md). Use a registered ATUM
-environment: trusted issuer/resource configuration, client ID, approved redirect
-URI (for code flow), resource account binding, a P-256 signing key and a measured
-clock adapter. Obtain these through the environment operator; do not construct
-trusted values from a request or a public passport URL.
+An agent uses its own P-256 key. Its owner's private key stays with the owner.
+The owner reviews the requested actions, limit and expiry and authorizes the
+agent through ATUM. Presenting somebody else's public passport URL is not proof
+of that authorization.
 
-1. Prepare an owner request with the exact actions, limits and expiry.
-2. Present the authorization-code or Device flow to the owner.
-3. Obtain the issued DPoP-bound token. Keep tokens and refresh state private.
-4. Persist one complete operation context and action before invoking the resource.
-5. Use `createProtectedResourceClient` for the nonce challenge and continuation.
-6. Persist the observed outcome with that original operation. Handle uncertainty
-   through the resource's authorized recovery process.
+Obtain trusted service/client configuration from the connected service. Choose
+Device flow for a command-line or headless agent, or authorization-code flow for
+an application with a registered HTTPS return address. Device-only clients do
+not need a fabricated return address. Authorization-code flow uses exact
+registered callbacks and PKCE.
 
-[The small invocation example](../examples/invoke.mjs) imports only public package
-exports. It is a function for your application: its configuration and input must
-come from your registered environment and actual authorization flow. It does not
-mint a grant, assign a new operation ID or simulate owner consent.
+1. Prepare a request for the service's registered permission names.
+2. Let the owner complete the actual ATUM consent flow.
+3. Exchange the approved request for an issued DPoP-bound token.
+4. Persist the operation identity and action parameters before sending work.
+5. Sign the resource request with the same agent key and complete its nonce
+   challenge without changing the original body/context.
+6. Keep the observed result with that operation. An uncertain result is not
+   permission to create and submit a replacement operation.
 
-`ResourceInvocationError` exposes safe `code` and `status` only. An unknown,
-timeout or malformed response must not cause another purchase under a new ID.
-The in-memory client fence lasts only for that client instance. Your host owns
-durable operation identity across restarts. There is no public status/read method
-in this preview; trusted server recovery is a separate capability.
+Use the [Agent API](../sdk/packages/agent/README.md) and the
+[independent service example](../sdk/examples/calendar-resource/README.md).
+The generic signing API works with registered service-owned actions and does not
+prescribe your service's result format. The existing MERX invocation client is a
+separate compatibility API with its own closed result schema.
 
-The resource client uses Node's default CA configuration when `tls` is omitted.
-For a development CA, pass the explicit trusted `{tls: {ca: pem}}`; never disable
-certificate or hostname checks. Existing issuer OAuth configuration requires its
-explicit CA bundle; that is a separate client configuration.
+Refresh remains subject to current permission, service/client lifecycle and
+revocation. A service's API credential cannot grant an agent permission. Owner
+revocation stops new authorized work; it is not a claim that a previously
+accepted external operation can be undone.
 
-Close clients in `finally`. Close/timeout stops local work but cannot cancel a
-request already accepted remotely. Do not log tokens, proofs, callback URLs,
-nonces, cookies or key material. Returned resource payloads are application data;
-apply your own data-handling policy before logging them.
+Keep tokens, refresh state and private keys secret. Verify TLS certificates and
+hostnames. Close clients when finished; local timeout/close cannot cancel work
+already accepted by a remote service. Persist operation identity across process
+restarts instead of relying only on an in-memory request fence.
+
+Web passkey authorization proves this owner's approval under the selected policy.
+Native phone enrollment and physical sensor-history evidence are separate layers;
+a successful web login is not labeled as physical-history verification.

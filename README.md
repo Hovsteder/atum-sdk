@@ -1,75 +1,80 @@
 # ATUM SDK
 
-Connect a software agent to owner-approved permissions, and verify its requests
-at your service. ATUM's SDK provides OAuth agent clients, request and authority
-verification, and durable PostgreSQL replay protection.
+Verify an agent's connection to its owner's passport and the owner's permission
+at your service. An agent obtains owner-approved access, signs each request with
+its own key, and your backend checks that permission through ATUM before applying
+its own rules.
 
-**Developer preview: 0.1.0-rc.1.** The first supported integration profile is the
-MERX sandbox. Public hosted onboarding is being prepared; this repository does
-not deploy an issuer or create a live passport by itself. See [release status](docs/status.md).
+A developer connects an existing service and chooses its action names. A calendar
+can use `calendar.event.read`; a document service can use `document.read`. MERX is
+the first reference integrator. Its Energy, pricing and order rules belong to its
+adapter and are not prerequisites for another service.
 
-## Try the code
+**Developer preview: 0.1.0-rc.2.** See [release status](docs/status.md) for the exact published
+version, local acceptance evidence and hosted API availability. The SDK repository
+does not contain the private ATUM server or create an owner's permission by itself.
 
-Requirements: Node.js 22.12+, npm, and OpenSSL for local HTTPS tests.
+## Start here
+
+| Your integration | Guide |
+| --- | --- |
+| Accept agents at an existing service | [Resource guide](docs/resource.md) and [calendar example](sdk/examples/calendar-resource/README.md) |
+| Register and manage a service | [Self-service setup](docs/service-registration.md) |
+| Connect an agent to owner approval | [Agent guide](docs/agent.md) and [Agent API](sdk/packages/agent/README.md) |
+| Verify current passport/permission policy | [Verification API](sdk/packages/verification/README.md) |
+| Store nonce and replay state durably | [PostgreSQL adapter](sdk/packages/replay-postgres/README.md) |
+| Understand hosted registration and separate native evidence | [Status and scope](docs/status.md) |
+
+An integrator's service credential authenticates the service to ATUM. The owner
+separately approves the agent's actions, limit and expiry. Neither a developer
+login, a service credential nor a public passport URL substitutes for that consent.
+
+## Packages
+
+| Package | Role |
+| --- | --- |
+| `@atum/agent` | P-256 signing, owner-request preparation, OAuth code/Device flows, DPoP-bound tokens and request proofs |
+| `@atum/verification` | Registered action/context validation, token/DPoP verification and current signed authority checks |
+| `@atum/replay-postgres` | Durable nonce issuance/consumption and proof replay protection |
+
+Requirements: Node.js 22.12+, npm, and OpenSSL for local HTTPS tests. Clone the
+matching release tag, then install the workspace:
 
 ```sh
-git clone --branch v0.1.0-rc.1 https://github.com/Hovsteder/atum-sdk.git
+git clone --branch v0.1.0-rc.2 https://github.com/Hovsteder/atum-sdk.git
 cd atum-sdk
 npm ci --ignore-scripts --no-audit --no-fund
 npm run example:verify
 npm run test:types
 ```
 
-The verification example uses a bundled synthetic signed request and demonstrates
-both signature verification and replay rejection. Its output explicitly grants
-no execution authority. No account, funds, live service or private server source
-is needed for this example.
+The offline verification example uses a public synthetic fixture. It demonstrates
+signature and replay checks and explicitly grants no execution authority. The
+calendar example shows the separate current-authorization and service-acceptance
+steps using an operator-provided ATUM host and issued tokens. Public ATUM hosting
+is still pending; this release supplies no live signup/API URL.
 
-## Choose your integration
+For an existing application, install the matching package tarballs from the
+[GitHub releases](https://github.com/Hovsteder/atum-sdk/releases). Install all three
+matching files together. npm registry publication is a separate step; package
+names in this guide do not claim they are available on npm.
 
-| You are building | Start here |
-| --- | --- |
-| An agent acting with its owner's permission | [Agent quickstart](docs/agent.md), [Agent API](sdk/packages/agent/README.md) |
-| A service that accepts ATUM agents | [Resource integration](docs/resource.md), [verification API](sdk/packages/verification/README.md) |
-| Persistent nonce/replay protection | [PostgreSQL adapter](sdk/packages/replay-postgres/README.md) |
-| An application that needs passport creation and agent management | [Hosted sandbox and owner flow](docs/status.md) |
+## Boundaries
 
-The public sandbox is ATUM's developer environment, with an entry point planned
-on `atum.digital`. MERX is the first reference service behind it. Developers
-will be able to create a passport, authorize their own agent, try a request,
-inspect the result, and revoke permission. SDK users can then implement the same
-resource-side boundaries in their own service.
+A valid signature is not owner permission. Use the current authorization API to
+check the issued grant and its current policy; use your own service to enforce
+business parameters, data ownership, usage and operation recovery. Verification
+never means an external operation has completed.
 
-## Packages
+Generic permissions authorize registered action names. Unsupported restriction
+fields reject rather than disappear. Existing MERX profiles remain explicit
+compatibility paths: a generic permission does not loosen an old exact-quote
+purchase grant.
 
-| Package | Role |
-| --- | --- |
-| `@atum/agent` | P-256 signing port, owner request preparation, OAuth code/Device flows, token refresh, nonce/invoke HTTPS client and TypeScript declarations |
-| `@atum/verification` | Issuer tokens and DPoP, complete intent binding, signed grant/admission checks, mTLS authority and owner-connector clients |
-| `@atum/replay-postgres` | Atomic nonce consumption and proof replay protection, with migrations |
+Web passkey consent and physical phone-history evidence are distinct. This public
+SDK does not ship the native Passport collection SDK or the server-side sensor
+consistency engine. Consult [status](docs/status.md) before relying on a particular
+evidence policy.
 
-Use the workspace installation above for this preview. npm registry publication
-is a separate release step; do not assume these names are available there.
-The package tarballs contain runtime files and documentation, not server code
-or test private keys. To add the packages to an existing application, download
-all three `.tgz` files from the matching [GitHub release](https://github.com/Hovsteder/atum-sdk/releases/tag/v0.1.0-rc.1),
-then install them together from their download directory:
-
-```sh
-npm install ./atum-agent-0.1.0-rc.1.tgz ./atum-verification-0.1.0-rc.1.tgz ./atum-replay-postgres-0.1.0-rc.1.tgz
-```
-
-The tarballs use matching exact package versions. A standalone application
-installation and ESM/CommonJS public imports are checked before release.
-
-## Security and lifecycle
-
-A valid request proof is not permission to execute. A resource also checks current
-grant/binding policy, reserves quota, obtains admission, and durably claims the
-original operation. A network timeout cannot undo a submitted operation. The
-client performs one nonce continuation and does not retry uncertain business work
-or invent a new operation ID. See [resource responsibilities](docs/resource.md).
-
-SDK source is licensed under [Apache-2.0](LICENSE). The ATUM server-side
-sensor-consistency engine, hosted-service credentials and private project history
-are outside this repository. [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md).
+Licensed under [Apache-2.0](LICENSE). [Contributing](CONTRIBUTING.md) ·
+[Security](SECURITY.md).

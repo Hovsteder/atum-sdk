@@ -1,6 +1,7 @@
 /** Pinned service assertions. These never turn a request proof into authority. */
 import { compactVerify, importJWK } from 'jose';
 import { actionHash, canonicalContext, intentHash, parseStrictJson, validateBoundIntent } from './context.mjs';
+import { normalizeProfileGrant, validateResourceRegistration } from './resource-profiles.mjs';
 
 const MAX_TIME = 8_640_000_000_000_000;
 const ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -39,20 +40,22 @@ function sample(clock, previous) {
     return { now, lower: now - uncertainty, upper: now + uncertainty };
   } catch { fail('temporarily_unavailable'); }
 }
-function bound(context, action, registration) {
+function bound(context, action, registration, descriptor) {
   try {
     const copied = structuredClone(context); const request = structuredClone(action);
-    validateBoundIntent(copied, request, registration);
+    validateBoundIntent(copied, request, registration, descriptor);
     return { context: frozen(copied), action: frozen(request) };
   } catch { fail('invalid_request'); }
 }
-function validRegistration(value) {
+function validRegistration(value, descriptor) {
   exact(value, REGISTRATION);
-  const action = { action: 'prices.read', parameters: {} };
-  const context = { ...value, protocol_version: '0.1.0-draft.2', scoped_subject: 'validation', operation_id: 'validation', grant_id: 'validation', grant_version: 1, agent_key_thumbprint: Buffer.alloc(32).toString('base64url'), consent_hash: `sha256:${'0'.repeat(64)}`, account_binding_id: 'validation', account_binding_version: 1, action: action.action, action_hash: actionHash(action) };
+  let selected;
+  try { selected = validateResourceRegistration(value, descriptor); } catch { fail(); }
+  const action = { action: selected.profile.kind === 'service' ? selected.profile.actions[0] : 'prices.read', parameters: {} };
+  const context = { ...value, protocol_version: '0.1.0-draft.2', scoped_subject: 'validation', operation_id: 'validation', grant_id: 'validation', grant_version: 1, agent_key_thumbprint: Buffer.alloc(32).toString('base64url'), consent_hash: `sha256:${'0'.repeat(64)}`, account_binding_id: 'validation', account_binding_version: 1, action: action.action, action_hash: actionHash(action, descriptor) };
   delete context.account_required_actions;
-  bound(context, action, value);
-  return frozen(structuredClone(value));
+  bound(context, action, value, descriptor);
+  return selected.registration;
 }
 function validPolicy(value) {
   if (value === null) return null;
@@ -62,28 +65,26 @@ function validPolicy(value) {
   value.source_profiles.forEach(id);
   return frozen(structuredClone(value));
 }
-function validGrant(value, registration) {
+function validGrant(value, registration, descriptor) {
   exact(value, ['template', 'client_id', 'grant_expires_at_ms', 'grant_limit', 'permissions']);
   id(value.client_id); integer(value.grant_expires_at_ms); integer(value.grant_limit, 0, 1000000000);
-  const dummy = { action: 'prices.read', parameters: {} };
+  let selected;
+  try { selected = validateResourceRegistration(registration, descriptor); } catch { fail(); }
+  const dummy = { action: selected.profile.kind === 'service' ? selected.profile.actions[0] : 'prices.read', parameters: {} };
   if (!plain(value.template) || [...OMIT_TEMPLATE].some(k => Object.hasOwn(value.template, k))) fail();
-  const validationContext = { ...value.template, operation_id: 'validation', action: dummy.action, action_hash: actionHash(dummy) };
+  const validationContext = { ...value.template, operation_id: 'validation', action: dummy.action, action_hash: actionHash(dummy, descriptor) };
   try {
-    canonicalContext(validationContext);
-    validateBoundIntent({ ...validationContext, account_binding_id: 'validation', account_binding_version: 1 }, dummy, registration);
+    canonicalContext(validationContext, descriptor);
+    validateBoundIntent({ ...validationContext, account_binding_id: 'validation', account_binding_version: 1 }, dummy, registration, descriptor);
   } catch { fail(); }
-  if (!Array.isArray(value.permissions) || !value.permissions.length || value.permissions.length > 3 || new Set(value.permissions.map(p => p?.action)).size !== value.permissions.length) fail();
-  for (const permission of value.permissions) {
-    if (value.template.account_binding_id === null && registration.account_required_actions.includes(permission?.action)) fail();
-    if (permission?.action === 'prices.read') exact(permission, ['action']);
-    else {
-      exact(permission, ['action', 'max_amount', 'max_duration', 'max_price_sun']);
-      if (!['order.preview', 'sandbox.execute'].includes(permission.action)) fail();
-      integer(permission.max_amount, 1, 1000000000); integer(permission.max_duration, 1, 2592000);
-      if (permission.max_price_sun !== null) integer(permission.max_price_sun, 1, 1000000000000);
-    }
-  }
-  return value;
+  let normalized;
+  try {
+    normalized = normalizeProfileGrant({ permissions: value.permissions, grant_limit: value.grant_limit,
+      grant_expires_at_ms: value.grant_expires_at_ms }, selected.profile);
+  } catch { fail(); }
+  for (const permission of normalized.permissions) if (value.template.account_binding_id === null
+      && registration.account_required_actions.includes(permission.action)) fail();
+  return { ...value, permissions: normalized.permissions };
 }
 function evidenceShape(value) {
   if (value === null) return null;
@@ -113,10 +114,10 @@ function decode(token, kind) {
   integer(claims.iat); integer(claims.exp); if (claims.exp <= claims.iat) fail();
   return { header, claims };
 }
-function snapshotData(claims, input, registration, policy, time, clientId) {
+function snapshotData(claims, input, registration, descriptor, policy, time, clientId) {
   const data = claims.data;
   exact(data, ['grant', 'status', 'evidence', 'issued_at_ms', 'valid_until_ms']);
-  validGrant(data.grant, registration); integer(data.issued_at_ms); integer(data.valid_until_ms);
+  validGrant(data.grant, registration, descriptor); integer(data.issued_at_ms); integer(data.valid_until_ms);
   if (data.status !== 'active' || data.grant.client_id !== clientId || data.issued_at_ms > time.upper) fail();
   const expectedTemplate = templateOf(input.context);
   if (Object.keys(expectedTemplate).some(k => expectedTemplate[k] !== data.grant.template[k])) fail();
@@ -126,11 +127,11 @@ function snapshotData(claims, input, registration, policy, time, clientId) {
   if (time.upper >= cap) fail('expired');
   return frozen({ ...data, authorization_effect: 'reservation_only', requires_admission: true });
 }
-function admissionData(claims, input, registration, time, mode) {
+function admissionData(claims, input, registration, descriptor, time, mode) {
   const data = claims.data;
   exact(data, ['context', 'intent_hash', 'admission_id', 'decision', 'reason', 'evaluated_at_ms', 'evaluated_uncertainty_ms', 'grant_expires_at_ms', 'acceptance_expires_at_ms', 'first_submit_expires_at_ms', 'evidence']);
-  try { validateBoundIntent(data.context, input.action, registration); } catch { fail(); }
-  if (canonicalContext(data.context) !== canonicalContext(input.context) || data.intent_hash !== intentHash(input.context) || claims.jti !== id(data.admission_id)) fail();
+  try { validateBoundIntent(data.context, input.action, registration, descriptor); } catch { fail(); }
+  if (canonicalContext(data.context, descriptor) !== canonicalContext(input.context, descriptor) || data.intent_hash !== intentHash(input.context, descriptor) || claims.jti !== id(data.admission_id)) fail();
   const evaluated = integer(data.evaluated_at_ms); const uncertainty = integer(data.evaluated_uncertainty_ms, 0, 1000); const expiry = integer(data.grant_expires_at_ms);
   if (evaluated < uncertainty || evaluated > time.upper || claims.iat !== Math.floor(evaluated / 1000)) fail();
   evidenceShape(data.evidence);
@@ -148,10 +149,12 @@ function admissionData(claims, input, registration, time, mode) {
 }
 
 export async function createAuthorityVerifier(config) {
-  let registration; let policy; let clock; let jwks;
+  let registration; let descriptor; let policy; let clock; let jwks;
   try {
-    exact(config, ['registration', 'evidencePolicy', 'issuerKeys', 'clock']);
-    registration = validRegistration(config.registration); policy = validPolicy(config.evidencePolicy);
+    exact(config, Object.hasOwn(config ?? {}, 'descriptor')
+      ? ['registration', 'descriptor', 'evidencePolicy', 'issuerKeys', 'clock'] : ['registration', 'evidencePolicy', 'issuerKeys', 'clock']);
+    descriptor = Object.hasOwn(config, 'descriptor') ? frozen(structuredClone(config.descriptor)) : undefined;
+    registration = validRegistration(config.registration, descriptor); policy = validPolicy(config.evidencePolicy);
     clock = config.clock; if (typeof clock !== 'function' || !plain(config.issuerKeys)) fail();
     jwks = structuredClone(config.issuerKeys);
     if (!Object.keys(jwks).length || Object.keys(jwks).length > 8) fail();
@@ -167,7 +170,7 @@ export async function createAuthorityVerifier(config) {
   async function verify(token, kind, context, actionRequest, clientId, mode) {
     try {
       // Capture all caller-owned objects before the first asynchronous crypto wait.
-      const input = bound(context, actionRequest, registration);
+      const input = bound(context, actionRequest, registration, descriptor);
       if (kind === 'snapshot') { try { id(clientId); } catch { fail('invalid_request'); } }
       if (kind === 'admission' && !['accept', 'inspect'].includes(mode)) fail('invalid_request');
       const before = sample(clock); const decoded = decode(token, kind); const key = keys.get(decoded.header.kid);
@@ -176,7 +179,7 @@ export async function createAuthorityVerifier(config) {
       if (claims.iss !== registration.issuer || claims.aud !== registration.audience || claims.sub !== input.context.scoped_subject) fail();
       await compactVerify(token, key, { algorithms: ['ES256'] });
       const after = sample(clock, before.now);
-      return kind === 'snapshot' ? snapshotData(claims, input, registration, policy, after, clientId) : admissionData(claims, input, registration, after, mode);
+      return kind === 'snapshot' ? snapshotData(claims, input, registration, descriptor, policy, after, clientId) : admissionData(claims, input, registration, descriptor, after, mode);
     } catch (error) {
       if (error instanceof AuthorityError) throw error;
       fail();

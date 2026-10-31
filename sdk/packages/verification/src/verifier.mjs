@@ -7,12 +7,15 @@ export { VerificationError };
 
 export async function createVerifier(config) {
   const configFields = new Set(['registration', 'issuerKeys', 'endpoint', 'clock', 'replayStore']);
+  if (Object.hasOwn(config ?? {}, 'descriptor')) configFields.add('descriptor');
   if (config === null || typeof config !== 'object' || Array.isArray(config) || Object.getPrototypeOf(config) !== Object.prototype
       || Object.keys(config).length !== configFields.size || Object.keys(config).some(key => !configFields.has(key))
       || typeof config.clock !== 'function' || config.replayStore === null || typeof config.replayStore !== 'object'
       || typeof config.replayStore.consume !== 'function' || !Array.isArray(config.issuerKeys) || !config.issuerKeys.length) throw new TypeError('invalid config');
   const consume = config.replayStore.consume.bind(config.replayStore);
-  const validator = await createProofValidator({ registration: config.registration, issuerKeys: config.issuerKeys, endpoint: config.endpoint, clock: config.clock });
+  const validatorConfig = { registration: config.registration, issuerKeys: config.issuerKeys, endpoint: config.endpoint, clock: config.clock };
+  if (Object.hasOwn(config, 'descriptor')) validatorConfig.descriptor = config.descriptor;
+  const validator = await createProofValidator(validatorConfig);
   return Object.freeze({ async verifyProtectedRequest(input) {
     try {
       const verified = await validator.validate(input, FULL_PROOF_FIELDS);

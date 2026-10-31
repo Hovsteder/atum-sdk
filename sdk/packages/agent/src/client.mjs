@@ -9,7 +9,7 @@ import { createTokenClient } from './token.mjs';
 
 const MAX_TIME = 8_640_000_000_000_000;
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
-const CONFIG_FIELDS = new Set(['registration', 'client', 'endpoints', 'tls', 'key', 'clock', 'timeoutMs', 'maxConcurrent']);
+const CONFIG_FIELDS = new Set(['registration', 'descriptor', 'client', 'endpoints', 'tls', 'key', 'clock', 'timeoutMs', 'maxConcurrent']);
 const CODE_BEGIN_FIELDS = new Set(['permissions', 'grant_limit', 'grant_expires_at_ms', 'redirect_uri']);
 const DEVICE_BEGIN_FIELDS = new Set(['permissions', 'grant_limit', 'grant_expires_at_ms']);
 const REFRESH_FIELDS = new Set(['refresh_token', 'authorization_details']);
@@ -57,14 +57,15 @@ function snapshot(value, invalid) {
 function configuration(value) {
   const source = record(value, CONFIG_FIELDS, invalidConfig);
   if (!['registration', 'client', 'endpoints', 'tls', 'key', 'clock'].every(field => Object.hasOwn(source, field))
-      || (Object.keys(source).length !== 6 && Object.keys(source).length !== 7 && Object.keys(source).length !== 8)
+      || Object.keys(source).length < 6 || Object.keys(source).length > 9
       || typeof source.clock !== 'function') invalidConfig();
   const timeoutMs = Object.hasOwn(source, 'timeoutMs') ? source.timeoutMs : 5000;
   const maxConcurrent = Object.hasOwn(source, 'maxConcurrent') ? source.maxConcurrent : 4;
   if (!integer(timeoutMs, 1, 5000) || !integer(maxConcurrent, 1, 16)) invalidConfig();
   let key;
   try { key = assertAgentKey(source.key); } catch { invalidConfig(); }
-  const saved = Object.freeze({ registration: snapshot(source.registration, invalidConfig), client: snapshot(source.client, invalidConfig),
+  const saved = Object.freeze({ registration: snapshot(source.registration, invalidConfig),
+    ...(Object.hasOwn(source, 'descriptor') ? { descriptor: snapshot(source.descriptor, invalidConfig) } : {}), client: snapshot(source.client, invalidConfig),
     endpoints: snapshot(source.endpoints, invalidConfig), tls: snapshot(source.tls, invalidConfig), key, clock: source.clock, timeoutMs, maxConcurrent });
   try {
     const validation = createRequestProofClient(saved);
@@ -304,6 +305,7 @@ export async function createAgentClient(config) {
     if (control?.cancelled()) throw unavailable();
     const sharedClock = childClock(operation, originalExpiry, control?.cancelled);
     const child = createTokenClient({ client_id: saved.client.client_id, token_url: saved.endpoints.token_url, tls: saved.tls,
+      registration: saved.registration, ...(saved.descriptor === undefined ? {} : { descriptor: saved.descriptor }),
       key: saved.key, clock: sharedClock.clock, timeoutMs: remaining(operation.deadline, saved.timeoutMs), maxConcurrent: 1 });
     operation.children.add(child);
     let result;

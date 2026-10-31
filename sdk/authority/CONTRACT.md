@@ -163,8 +163,8 @@ Node verifyAdmission(assertion,context,actionRequest,{mode:"accept"|"inspect"}):
 
 ### MERX sandbox acceptance
 
-The accepted MERX sandbox rule is recorded below; see [release status](../../docs/status.md)
-for the scope of joined integration evidence.
+This compatibility rule applies to the MERX sandbox integration. For generic
+service acceptance, see the [resource guide](../../docs/resource.md).
 Let `A=min(evaluated_at_ms+10000,grant_expires_at_ms)` and
 `S=min(evaluated_at_ms+30000,grant_expires_at_ms)`. Every time guard uses a healthy
 measured clock and strict `clock.upper < deadline`. These are sandbox windows;

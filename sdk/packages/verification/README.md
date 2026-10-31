@@ -1,6 +1,6 @@
 # ATUM verification component
 
-Developer preview package `@atum/verification@0.1.0-rc.1`, Node >=22.12.
+Public developer-preview package `@atum/verification@0.1.0-rc.2`, Node >=22.12.
 This is the protected-request part of G0, consuming the unchanged draft.2 context contract.
 It verifies issuer-signed access tokens, the agent's DPoP proof and the complete operation
 context. It returns `requires_admission: true`; it does not issue an execution permission.
@@ -27,7 +27,7 @@ as an admission decision or pass agent-supplied copies of it across a trust boun
 From this directory:
 
 ```sh
-npm ci --ignore-scripts --no-audit --no-fund --prefix ../../..
+npm ci --ignore-scripts --no-audit --no-fund
 npm test
 ```
 
@@ -42,7 +42,7 @@ snapshots and algorithm confusion. Some environments display file-level counts f
 Independent signature check, with Python `cryptography` installed in an isolated environment:
 
 ```sh
-python3 tools/check-signatures.py
+python tools/check-signatures.py
 ```
 
 It checks 96 signature expectations using a separate implementation, and checks the positive
@@ -61,23 +61,83 @@ validate and consume issued, bound, unexpired nonces and insert proof replay ide
 persist across restarts and multiple workers, and fail unavailable on backend errors.
 The clock bound is a candidate parameter, still subject to shared clock-health agreement.
 
-OAuth issuer/persistent adapter, real owner consent proof, joint signed-transport acceptance,
-native evidence ingestion and the complete G0 bundle remain separate work. This package
-and its self-tests do not close G0 or prove a real person's physical history. Nothing here
-mounts a MERX route, reaches production or executes a financial action.
+The private issuer and owner services have separate hosting and lifecycle requirements. This package alone cannot create consent or establish physical phone history. See [release status](../../../docs/status.md) for local integration evidence and public hosting availability.
 
 ## Signed authority component
 
 The separate `@atum/verification/authority` export verifies pinned grant snapshots and
 immutable admission assertions. See `../../authority/CONTRACT.md` and `README.md`.
 The request-proof verifier remains proof-only; these distinct results must not be cast
-into one another. The new resource client supplies mTLS transport; joint MERX transport acceptance, actual consent/issuer and full G0 remain open.
+into one another. The resource client supplies explicit mTLS or scoped-service-credential HTTPS transport. Current authorization composes proof and live signed authority checks.
+
+## Neutral service-action profile
+
+`@atum/verification/service-profile` exports the generic
+`atum.service-actions.v1-draft.1` descriptor helpers. A descriptor contains a
+sorted finite `actions` list and its sorted `account_required_actions` subset;
+its canonical UTF-8 JSON SHA-256 is the registration's profile hash. Every
+verifier/authority factory receives that descriptor from immutable trusted
+configuration beside the registration. Request payloads never select or modify it.
+
+Neutral actions are exact `{action,parameters}` objects. The action must be in
+the descriptor and is at most 128 characters. Parameters use canonical JSON with printable ASCII object keys,
+Unicode-scalar string values, safe integers, depth at most 8, and at most 16,384
+canonical UTF-8 bytes. Floats, negative zero, unpaired surrogates and unknown
+permission fields fail closed. Sparse arrays and arrays with custom or symbol
+properties also fail closed. A neutral permission is exactly `{action}`; it
+does not express or enforce opaque business predicates. The generic action hash
+uses `atum.service.action.v1\n`. Proof verification still returns no authority,
+and signed authority verification still does not execute or validate a service's
+business result.
+
+The fixed MERX implementations remain available through the old
+`resource-profiles` import and the explicit `@atum/verification/merx-compat`
+facade. Their hashes, domains and canonical bytes are unchanged.
+
+## Fresh current authorization
+
+`@atum/verification/current-authorization` exports
+`createCurrentAuthorizationVerifier`. The factory receives one immutable
+registration/descriptor, token issuer keys, atomic replay store, pinned authority
+keys and explicit mTLS or scoped-service-credential HTTPS transport settings. `verifyCurrent(protectedRequest)` validates and
+consumes the request proof, then fetches a fresh snapshot and makes one fresh
+admission request. It verifies both signed facts against the exact context,
+action, client and intent. It never retries or calls historical retrieval after
+an ambiguous admission response.
+
+The frozen result has `authorization_effect:'current_permission'` and
+`requires_resource_acceptance:true`. It exposes the scoped subject, agent key,
+context and action, original permissions and `grant_limit`, proof/admission IDs,
+evaluated clock uncertainty, and every relevant expiry. `grant_limit` is the
+owner-approved original cap, not remaining usage. The resource must atomically
+accept/consume it and provide operation idempotency before doing work. Existing
+`verifyAdmission(...,{mode:'inspect'})` remains the separate historical API and
+never yields current permission. See the independent
+[calendar resource example](../../examples/calendar-resource/README.md).
+
+## Registered Energy profile candidate
+
+`@atum/verification/resource-profiles` exports immutable `MERX_SANDBOX_V1`
+and `MERX_ENERGY_V1` built-ins. The latter is the reviewed
+`merx.energy-purchase.v1-draft.1` production-environment registration with
+descriptor hash `sha256:e1c5106dc710ce0ba3d846f3cb376358eb858c35adfbac906f0ff58f3a6451fa`.
+The runtime descriptor bytes are package-owned; matching canonical JSON and
+Node/Python known answers are in `../../protocol/resource-profiles/`. Unknown
+version/hash/environment tuples fail closed, and historical sandbox bytes stay
+unchanged.
+
+The Energy action validates the full TRON Base58Check checksum, exact UUIDv4,
+supported term, provider, quote deadline, and canonical unsigned decimal SUN
+strings through `Number.MAX_SAFE_INTEGER`. Its single permission is the exact
+`{action,parameters}` request, with `grant_limit: 1` and grant expiry no later
+than the quote. This is registry, consent, token and proof support; it does not
+mount a provider adapter, reserve money, report delivery, or authorize live spend.
 
 ## Nonce-omitted challenge verifier
 
 The nonce-challenge package subpath exports createNonceChallengeVerifier with
 trusted registration, issuer keys, endpoint and measured clock. It is an
-additive cryptographic preparation port for a future same-protected-POST DPoP
+additive cryptographic preparation port for the same-protected-POST DPoP
 nonce challenge. It does not mount HTTP, create a nonce, call replay storage,
 contact admission, reserve quota, or execute an operation.
 
@@ -147,7 +207,7 @@ try {
 A MERX adapter translates its existing `actionRequest`/`clientId` to
 `action_request`/`client_id`. Only a `ResourceTransportError` with code `not_found`
 from explicit historical `retrieve` may map to MERX's null result. Do not use
-a generic catch-to-null or silently retry admission. See the recorded
+a generic catch-to-null or silently retry admission. See the executable
 [cross-language E2E](../../../docs/status.md) for actual signatures,
 mTLS, separate service processes and database restart.
 

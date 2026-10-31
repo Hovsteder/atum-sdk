@@ -13,6 +13,13 @@ import { createProtectedRequestSigner } from '../src/resource-proof.mjs';
 const NOW = 1_800_000_000_000;
 const endpoint = { method: 'POST', url: 'https://resource.example.test/v1/orders' };
 const action_request = { action: 'order.preview', parameters: { resource: 'ENERGY', amount: 2, duration: 30, max_price_sun: 0 + 9 } };
+const energy_action = { action: 'energy.purchase', parameters: {
+  network: 'tron-mainnet', resource: 'ENERGY', amount: 65_000, duration_sec: 3_600,
+  recipient: 'TA4Wt1DUCqz6YegbnsmqsWC5uUfbdBqPxm', execution_provider: 'powersun-merx',
+  quote_id: '123e4567-e89b-42d3-a456-426614174000', quote_expires_at_ms: NOW + 300_000,
+  resource_cost_sun: '1105000', platform_fee_sun: '0', activation_fee_cap_sun: '100000',
+  network_fee_cap_sun: '0', max_total_debit_sun: '1205000',
+} };
 const contextBase = {
   protocol_version: '0.1.0-draft.2', resource_profile_version: 'v1-draft.1',
   resource_profile_hash: 'sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175',
@@ -61,7 +68,18 @@ async function fixture(overrides = {}) {
   const issuerJwk = { ...(await exportJWK(issuer.publicKey)), kid: 'issuer-resource', alg: 'RS256', use: 'sig' };
   const publicJwk = await exportJWK(agent.publicKey);
   const thumbprint = await calculateJwkThumbprint(publicJwk, 'sha256');
-  const context = { ...contextBase, agent_key_thumbprint: thumbprint };
+  const selectedAction = overrides.energy ? energy_action : action_request;
+  const context = { ...contextBase, ...(overrides.energy ? {
+    resource_profile_version: 'merx.energy-purchase.v1-draft.1',
+      resource_profile_hash: 'sha256:e1c5106dc710ce0ba3d846f3cb376358eb858c35adfbac906f0ff58f3a6451fa',
+    environment: 'production', operation_namespace: 'energy', action: selectedAction.action,
+    action_hash: actionHash(selectedAction),
+  } : {}), agent_key_thumbprint: thumbprint };
+  const configuredRegistration = overrides.energy ? {
+    ...registration, environment: context.environment, operation_namespace: context.operation_namespace,
+    resource_profile_version: context.resource_profile_version, resource_profile_hash: context.resource_profile_hash,
+    account_required_actions: ['energy.purchase'],
+  } : registration;
   let signs = 0;
   const key = await createAgentKey({ publicJwk, timeoutMs: overrides.keyTimeoutMs ?? 5000, sign: async data => {
     signs += 1;
@@ -69,7 +87,7 @@ async function fixture(overrides = {}) {
     return nodeSign('sha256', data, { key: agent.privateKey, dsaEncoding: 'ieee-p1363' });
   } });
   const clock = overrides.clock ?? (() => ({ now_ms: NOW, uncertainty_ms: 0, healthy: true }));
-  const signer = createProtectedRequestSigner({ key, registration, endpoint, clock, timeoutMs: overrides.timeoutMs ?? 5000 });
+  const signer = createProtectedRequestSigner({ key, registration: configuredRegistration, endpoint, clock, timeoutMs: overrides.timeoutMs ?? 5000 });
   const token = await new SignJWT({
     iss: context.issuer, aud: context.audience, sub: context.scoped_subject, client_id: 'client1', jti: 'token-jti',
     iat: NOW / 1000 - 1, exp: NOW / 1000 + 120, cnf: { jkt: thumbprint }, scope: 'atum:invoke',
@@ -79,8 +97,8 @@ async function fixture(overrides = {}) {
       .concat([['proof_profile', 'atum-dpop-v1-draft.1']])),
   }).setProtectedHeader({ typ: 'at+jwt', alg: 'RS256', kid: issuerJwk.kid }).sign(issuer.privateKey);
   const store = new ReplayStore();
-  const verifierConfig = { registration, issuerKeys: [issuerJwk], endpoint, clock };
-  return { signer, key, token, context, store, verifierConfig, signs: () => signs };
+  const verifierConfig = { registration: configuredRegistration, issuerKeys: [issuerJwk], endpoint, clock };
+  return { signer, key, token, context, store, verifierConfig, action: selectedAction, signs: () => signs };
 }
 
 test('signs exact protected and nonce-challenge requests accepted by unchanged public verifiers', async () => {
@@ -116,6 +134,22 @@ test('signs exact protected and nonce-challenge requests accepted by unchanged p
   assert.equal(result.proof_verified, true);
   assert.equal(result.authorization_effect, 'none');
   assert.equal(result.requires_admission, true);
+});
+
+test('Agent signs and verifier accepts the exact production Energy intent', async () => {
+  const f = await fixture({ energy: true });
+  const request = await f.signer.sign({ access_token: f.token, context: f.context, action_request: f.action, nonce });
+  assert.equal(JSON.parse(request.body).action_request.action, 'energy.purchase');
+  assert.equal(decoded(request.dpop).claims.atum_intent_hash, intentHash(f.context));
+  f.store.issue({ issuer: f.context.issuer, audience: f.context.audience,
+    agent_key_thumbprint: f.context.agent_key_thumbprint, endpoint_url: endpoint.url, nonce });
+  const verifier = await createVerifier({ ...f.verifierConfig, replayStore: f.store });
+  const result = await verifier.verifyProtectedRequest(request);
+  assert.equal(result.proof_verified, true);
+  const invalid = structuredClone(f.action);
+  invalid.parameters.recipient = `${invalid.parameters.recipient.slice(0, -1)}n`;
+  await assert.rejects(f.signer.sign({ access_token: f.token, context: f.context, action_request: invalid, nonce }),
+    agentCode('invalid_request'));
 });
 
 test('snapshots intent before await and emits a fresh JTI for the same stable operation', async () => {

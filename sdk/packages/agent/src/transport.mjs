@@ -67,18 +67,19 @@ function caBundle(value) {
 function configuration(value) {
   const config = plainRecord(value, new Set(['endpoints', 'tls', 'timeoutMs', 'maxConcurrent']), invalidConfig);
   const endpoints = plainRecord(config.endpoints, new Set(['options_url', 'verify_url']), invalidConfig);
-  const transportTls = plainRecord(config.tls, new Set(['ca']), invalidConfig);
+  const tlsFields = config.tls && Object.hasOwn(config.tls, 'ca') ? new Set(['ca']) : new Set();
+  const transportTls = plainRecord(config.tls, tlsFields, invalidConfig);
   if (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1 || config.timeoutMs > 5000
       || !Number.isSafeInteger(config.maxConcurrent) || config.maxConcurrent < 1 || config.maxConcurrent > 16) invalidConfig();
-  const ca = caBundle(transportTls.ca);
+  const ca = Object.hasOwn(transportTls, 'ca') ? caBundle(transportTls.ca) : undefined;
   const options = endpoint(endpoints.options_url, invalidConfig);
   const verify = endpoint(endpoints.verify_url, invalidConfig);
   if (options.origin !== verify.origin) invalidConfig();
-  try { tls.createSecureContext({ ca, minVersion: 'TLSv1.2' }); } catch { invalidConfig(); }
+  try { tls.createSecureContext({ ...(ca === undefined ? {} : { ca }), minVersion: 'TLSv1.2' }); } catch { invalidConfig(); }
   return Object.freeze({
     endpoints: Object.freeze({ options: Object.freeze({ hostname: options.hostname, port: options.port, host: options.host, path: options.pathname }),
       verify: Object.freeze({ hostname: verify.hostname, port: verify.port, host: verify.host, path: verify.pathname }) }),
-    ca,
+      ca,
     timeoutMs: config.timeoutMs,
     maxConcurrent: config.maxConcurrent,
   });
@@ -126,7 +127,7 @@ export function createRequestTransport(config) {
   let agent;
   try {
     agent = new https.Agent({ keepAlive: false, maxSockets: saved.maxConcurrent, maxFreeSockets: 0, maxCachedSessions: 0,
-      ca: saved.ca, minVersion: 'TLSv1.2', rejectUnauthorized: true });
+      ...(saved.ca === undefined ? {} : { ca: saved.ca }), minVersion: 'TLSv1.2', rejectUnauthorized: true });
   } catch { invalidConfig(); }
   let closed = false;
   let active = 0;

@@ -4,10 +4,26 @@
 prepares signed owner-consent requests, runs PAR/PKCE authorization-code and
 Device flows, rotates refresh tokens, and signs protected resource requests.
 
-This developer preview supports the pinned sandbox profile on Node.js 22.12
-or newer. Install it through the repository root workspace; npm registry
-publication is separate. See [PROFILE.md](./PROFILE.md)
-for the complete configuration and wire contract.
+This is the public `0.1.0-rc.2` developer preview for Node.js 22.12+. Install the matching GitHub release packages; npm registry publication is separate. See [PROFILE.md](./PROFILE.md) for the wire contract and [release status](../../../docs/status.md) for hosted availability.
+
+The Agent also accepts a trusted `atum.service-actions.v1-draft.1` descriptor
+beside a matching registration. The descriptor names a service-owned finite
+action set and account-required subset; it is configuration, never request data.
+Neutral owner requests carry permissions as exact `{action}` objects, and the
+protected signer accepts `{action,parameters}` with bounded canonical JSON. This
+path signs requests only. It does not call the service, interpret its result, or
+apply MERX's order/delivery rules.
+
+For Energy, `EnergyPurchasePermission` contains the complete exact quote action.
+Runtime validation requires the trusted production profile hash, current account
+binding, one permission, `grant_limit: 1`, grant expiry at or before the original
+quote deadline, a valid TRON Base58Check recipient and exact fee sum. Refresh and
+resource proofs retain those bytes. The MERX compatibility resource receipt envelope remains
+`merx-atum-resource-v1-draft.1`. For a successful Energy operation the client now
+accepts only `{order_id,status:'delivered',charged_sun}`: the order ID is canonical
+lowercase UUIDv4 and the canonical positive SUN charge is bounded by the original
+snapshotted quote's `resource_cost_sun` and `max_total_debit_sun`. This validates
+the returned contract; it does not query the provider or independently prove delivery.
 
 ## TypeScript declarations
 
@@ -15,18 +31,26 @@ The package ships NodeNext-compatible declarations for the root import and the
 documented `client`, `key`, `request-proof`, `resource-proof`, and `resource-client` subpaths.
 They describe the public configuration, signing port, flows, token artifacts,
 resource context/action, signature artifact, and `AgentError.code` union. The
-types reflect the action-specific public fields, but TypeScript cannot prove
+registration, prepared-request and resource-context types cover the pinned
+sandbox/Energy tuples and the generic descriptor-bound profile. Generic Agent
+configuration requires `descriptor`; `NamedServicePermission` and
+`GenericServiceActionRequest` expose service-owned names and parameters. The
+declarations cannot prove at compile time that an arbitrary string belongs to a
+specific runtime descriptor, so every factory repeats membership validation.
+For compatibility, `EnergyPurchaseActionRequest` is accepted by the protected signer and client;
+`EnergyPurchaseResult` describes the closed delivered result.
+The types reflect the action-specific public fields, but TypeScript cannot prove
 runtime closed-object validation, numeric bounds, URL policy, cryptographic key
 admission, or trusted issuer configuration. A clock port may report dynamic
 health, but every operation requires its sampled `healthy` value to be `true`.
 Keep the runtime checks in
 the execution path.
 
-To check the included ESM and CommonJS fixtures, run the pinned workspace compiler
-from the repository root:
+To check the included ESM and CommonJS fixtures, use an already approved local
+TypeScript compiler; the repository supplies one for its type checks:
 
 ```sh
-npm run test:types
+<typescript-bin> -p test/types/tsconfig.json
 ```
 
 ## Public API
@@ -195,8 +219,10 @@ flows, one exact token DPoP nonce continuation, refresh rotation, revoked-grant
 `invalid_grant`, protected request signing, and actual owner/issuer browser
 acceptance.
 
-`createProtectedResourceClient` is the public sandbox client for the fixed
-`POST /v1/atum/operations` profile. It takes the same protected-request input,
+`createProtectedResourceClient` is the public package client for the fixed
+`POST /v1/atum/operations` envelope and the pinned sandbox and Energy profiles.
+The Energy support is compatibility-profile code, not a deployed production
+service. The client takes the same protected-request input,
 performs one nonce challenge and at most one fresh-proof continuation, then returns
 only the closed operation result. The default TLS trust is Node's default CA configuration;
 use exact `{ tls: { ca } }` only for a private CA. It never retries a business
@@ -206,10 +232,10 @@ offers status/read.
 ```js
 import { createProtectedResourceClient } from '@atum/agent/resource-client';
 
-export async function invokeSandboxOperation({ registration, key, endpoint, clock,
-  sandboxCaPem, accessToken, context, actionRequest }) {
+export async function invokeOperation({ registration, key, endpoint, clock,
+  caPem, accessToken, context, actionRequest }) {
   const resource = createProtectedResourceClient({ registration, key, endpoint,
-    clock, tls: { ca: sandboxCaPem }, timeoutMs: 5000 });
+    clock, tls: { ca: caPem }, timeoutMs: 5000 });
   try {
     return await resource.invoke({ access_token: accessToken, context, action_request: actionRequest });
   } finally { await resource.close(); }
@@ -219,8 +245,8 @@ export async function invokeSandboxOperation({ registration, key, endpoint, cloc
 The process-local client fences every attempted `operation_id`, including an
 unknown/timeout outcome, until `close()`. The host must persist original operation
 state and recover it through its durable resource protocol; a timeout cannot cancel
-an already received request. This is a sandbox integration only: it does not
-authorize real-money activity or establish physical/native evidence.
+an already received request. Local validation does not authorize spending, add a
+status/read API, establish physical/native evidence, or show that any endpoint is deployed.
 
 Not provided: discovery, proxies, cookies, live status reads, durable flow
 persistence, automatic retry after ambiguous I/O, or production deployment.

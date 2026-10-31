@@ -1,6 +1,7 @@
 import https from 'node:https';
 import tls from 'node:tls';
 import { parseStrictJson, validateBoundIntent } from './context.mjs';
+import { validateResourceRegistration } from './resource-profiles.mjs';
 
 const MAX_BODY = 32768;
 const MAX_RESPONSE = 65536;
@@ -18,6 +19,11 @@ const METHODS = Object.freeze({
   admit: '/v1/authority/admissions',
   retrieve: '/v1/authority/admissions/retrieve',
 });
+const SERVICE_METHODS = Object.freeze({
+  snapshot: '/v1/service/authority/grant-snapshot',
+  admit: '/v1/service/authority/admissions',
+  retrieve: '/v1/service/authority/admissions/retrieve',
+});
 
 export class ResourceTransportError extends Error {
   constructor(code) { super(code); this.name = 'ResourceTransportError'; this.code = code; }
@@ -32,21 +38,22 @@ function frozenCopy(value) {
   if (plain(value)) return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, frozenCopy(item)])));
   return value;
 }
-function validRegistration(value) {
-  const fields = new Set(['issuer', 'audience', 'environment', 'tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace', 'resource_profile_version', 'resource_profile_hash', 'policy_version', 'account_required_actions']);
-  const id = /^[A-Za-z0-9._:-]{1,128}$/;
-  const party = /^[A-Za-z0-9:/._-]{1,256}$/;
-  return exact(value, fields) && typeof value.issuer === 'string' && party.test(value.issuer)
-    && typeof value.audience === 'string' && party.test(value.audience) && value.environment === 'sandbox'
-    && value.resource_profile_version === 'v1-draft.1' && /^sha256:[0-9a-f]{64}$/.test(value.resource_profile_hash)
-    && ['tenant_id', 'resource_id', 'quota_scope_id', 'operation_namespace', 'policy_version'].every(key => typeof value[key] === 'string' && id.test(value[key]))
-    && Array.isArray(value.account_required_actions) && value.account_required_actions.every(action => ['prices.read', 'order.preview', 'sandbox.execute'].includes(action))
-    && new Set(value.account_required_actions).size === value.account_required_actions.length;
+function validRegistration(value, descriptor) {
+  try { validateResourceRegistration(value, descriptor); return true; } catch { return false; }
 }
 
 function configCopy(config) {
-  if (!exact(config, new Set(['baseUrl', 'registration', 'tls', 'timeoutMs', 'maxConcurrent'])) || !plain(config.tls)
-      || typeof config.baseUrl !== 'string' || !exact(config.tls, new Set(['ca', 'cert', 'key'])) || [config.tls.ca, config.tls.cert, config.tls.key].some(value => typeof value !== 'string' || !value.length)
+  const credentialMode = Object.hasOwn(config ?? {}, 'serviceCredential');
+  const fields = new Set(['baseUrl', 'registration', credentialMode ? 'https' : 'tls', 'timeoutMs', 'maxConcurrent']);
+  if (credentialMode) fields.add('serviceCredential');
+  if (Object.hasOwn(config ?? {}, 'descriptor')) fields.add('descriptor');
+  const transport = credentialMode ? config.https : config.tls;
+  if (!exact(config, fields) || !plain(transport)
+      || typeof config.baseUrl !== 'string'
+      || (!credentialMode && (!exact(transport, new Set(['ca', 'cert', 'key'])) || [transport.ca, transport.cert, transport.key].some(value => typeof value !== 'string' || !value.length)))
+      || (credentialMode && (!exact(transport, Object.hasOwn(transport, 'ca') ? new Set(['ca']) : new Set())
+        || (Object.hasOwn(transport, 'ca') && (typeof transport.ca !== 'string' || !transport.ca.length))
+        || typeof config.serviceCredential !== 'string' || !/^atum_svc_[A-Za-z0-9_-]{43}$/.test(config.serviceCredential)))
       || !Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 1 || config.timeoutMs > 10000
       || !Number.isSafeInteger(config.maxConcurrent) || config.maxConcurrent < 1 || config.maxConcurrent > 16) throw new TypeError('invalid config');
   let base;
@@ -54,19 +61,22 @@ function configCopy(config) {
     if (/\\s|\\\\/.test(config.baseUrl)) throw new TypeError('invalid config');
     base = new URL(config.baseUrl);
     if (base.protocol !== 'https:' || config.baseUrl !== base.origin && config.baseUrl !== `${base.origin}/`) throw new TypeError('invalid config');
-    tls.createSecureContext({ ca: config.tls.ca, cert: config.tls.cert, key: config.tls.key, minVersion: 'TLSv1.2' });
+    tls.createSecureContext({ ...(Object.hasOwn(transport, 'ca') ? { ca: transport.ca } : {}), ...(credentialMode ? {} : { cert: transport.cert, key: transport.key }), minVersion: 'TLSv1.2' });
   } catch { throw new TypeError('invalid config'); }
   try {
     const registration = structuredClone(config.registration);
-    if (!validRegistration(registration)) throw new TypeError('invalid config');
-    return frozenCopy({ baseUrl: base.href, hostname: base.hostname, port: base.port, registration, tls: structuredClone(config.tls), timeoutMs: config.timeoutMs, maxConcurrent: config.maxConcurrent });
+    const descriptor = Object.hasOwn(config, 'descriptor') ? structuredClone(config.descriptor) : undefined;
+    if (!validRegistration(registration, descriptor)) throw new TypeError('invalid config');
+    return frozenCopy({ baseUrl: base.href, hostname: base.hostname, port: base.port, registration, descriptor,
+      transport: structuredClone(transport), credential: credentialMode ? config.serviceCredential : null,
+      timeoutMs: config.timeoutMs, maxConcurrent: config.maxConcurrent });
   } catch { throw new TypeError('invalid config'); }
 }
 
-function requestCopy(input, registration) {
+function requestCopy(input, registration, descriptor) {
   if (!exact(input, new Set(['context', 'action_request', 'client_id'])) || typeof input.client_id !== 'string' || !CLIENT_ID.test(input.client_id)) throw invalid();
   let copy;
-  try { copy = structuredClone(input); validateBoundIntent(copy.context, copy.action_request, registration); } catch { throw invalid(); }
+  try { copy = structuredClone(input); validateBoundIntent(copy.context, copy.action_request, registration, descriptor); } catch { throw invalid(); }
   let body;
   try { body = Buffer.from(JSON.stringify(copy), 'utf8'); } catch { throw invalid(); }
   if (body.length > MAX_BODY) throw invalid();
@@ -104,14 +114,16 @@ function resultFor(response, bytes) {
 export function createResourceClient(config) {
   const saved = configCopy(config);
   let agent;
-  try { agent = new https.Agent({ keepAlive: true, maxSockets: saved.maxConcurrent, maxFreeSockets: 0, maxCachedSessions: 0, ca: saved.tls.ca, cert: saved.tls.cert, key: saved.tls.key, minVersion: 'TLSv1.2', rejectUnauthorized: true }); } catch { throw new TypeError('invalid config'); }
+  try { agent = new https.Agent({ keepAlive: true, maxSockets: saved.maxConcurrent, maxFreeSockets: 0, maxCachedSessions: 0,
+    ...(Object.hasOwn(saved.transport, 'ca') ? { ca: saved.transport.ca } : {}), ...(saved.credential === null ? { cert: saved.transport.cert, key: saved.transport.key } : {}),
+    minVersion: 'TLSv1.2', rejectUnauthorized: true }); } catch { throw new TypeError('invalid config'); }
   let closed = false;
   let active = 0;
   const operations = new Set();
 
   function call(route, input) {
     let request;
-    try { request = requestCopy(input, saved.registration); } catch (error) { return Promise.reject(error instanceof ResourceTransportError ? error : invalid()); }
+    try { request = requestCopy(input, saved.registration, saved.descriptor); } catch (error) { return Promise.reject(error instanceof ResourceTransportError ? error : invalid()); }
     if (closed || active >= saved.maxConcurrent) return Promise.reject(unavailable());
     active += 1;
     return new Promise((resolve, reject) => {
@@ -140,7 +152,7 @@ export function createResourceClient(config) {
       operation.destroy = () => { finish(unavailable()); destroy(); };
       timer = setTimeout(() => { finish(unavailable()); destroy(); }, saved.timeoutMs);
       try {
-        const req = https.request({ protocol: 'https:', hostname: saved.hostname, port: saved.port || undefined, servername: saved.hostname, path: route, method: 'POST', agent, minVersion: 'TLSv1.2', rejectUnauthorized: true, headers: { Host: saved.port ? `${saved.hostname}:${saved.port}` : saved.hostname, 'Content-Type': 'application/json', 'Content-Length': String(request.body.length), Accept: 'application/json', 'Cache-Control': 'no-store' } }, (res) => {
+          const req = https.request({ protocol: 'https:', hostname: saved.hostname, port: saved.port || undefined, servername: saved.hostname, path: route, method: 'POST', agent, minVersion: 'TLSv1.2', rejectUnauthorized: true, headers: { Host: saved.port ? `${saved.hostname}:${saved.port}` : saved.hostname, 'Content-Type': 'application/json', 'Content-Length': String(request.body.length), Accept: 'application/json', 'Cache-Control': 'no-store', ...(saved.credential === null ? {} : { Authorization: `Bearer ${saved.credential}` }) } }, (res) => {
           const chunks = []; let size = 0; let responseComplete = false;
           const failResponse = () => { finish(unavailable()); destroy(); };
           res.on('data', chunk => {
@@ -167,9 +179,9 @@ export function createResourceClient(config) {
     });
   }
   return Object.freeze({
-    snapshot(input) { return call(METHODS.snapshot, input); },
-    admit(input) { return call(METHODS.admit, input); },
-    retrieve(input) { return call(METHODS.retrieve, input); },
+    snapshot(input) { return call((saved.credential === null ? METHODS : SERVICE_METHODS).snapshot, input); },
+    admit(input) { return call((saved.credential === null ? METHODS : SERVICE_METHODS).admit, input); },
+    retrieve(input) { return call((saved.credential === null ? METHODS : SERVICE_METHODS).retrieve, input); },
     async close() {
       if (!closed) {
         closed = true;

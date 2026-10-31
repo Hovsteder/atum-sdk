@@ -1,6 +1,6 @@
 {
   "name": "atum-sdk",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -8,10 +8,11 @@
     "node": ">=22.12.0"
   },
   "workspaces": [
-    "sdk/packages/*"
+    "sdk/packages/*",
+    "sdk/examples/calendar-resource"
   ],
   "scripts": {
-    "test": "npm test --workspaces",
+    "test": "npm test --workspace @atum/agent --workspace @atum/verification --workspace @atum/replay-postgres",
     "test:types": "tsc -p sdk/packages/agent/test/types/tsconfig.json",
     "test:postgres": "npm run test:postgres --workspace @atum/replay-postgres",
     "example:verify": "node examples/verify-proof.mjs"

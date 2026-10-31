@@ -36,7 +36,7 @@ function frozenCopy(value) {
 function validRegistration(value) {
   const party = /^[A-Za-z0-9:/._-]{1,256}$/;
   return exact(value,new Set(CONTEXT)) && ['issuer','audience'].every(key => typeof value[key] === 'string' && party.test(value[key]))
-    && value.environment === 'sandbox' && ['tenant_id','resource_id','quota_scope_id'].every(key => typeof value[key] === 'string' && ID.test(value[key]));
+    && ['sandbox', 'production'].includes(value.environment) && ['tenant_id','resource_id','quota_scope_id'].every(key => typeof value[key] === 'string' && ID.test(value[key]));
 }
 function isTime(value) { return Number.isSafeInteger(value) && !Object.is(value,-0) && value >= 0 && value <= 8640000000000000; }
 function isHandle(value) { return typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value) && Buffer.from(value,'base64url').length === 32 && Buffer.from(value,'base64url').toString('base64url') === value; }

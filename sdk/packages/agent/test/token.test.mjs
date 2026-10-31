@@ -216,6 +216,8 @@ test('invalid configuration and caller input fail before signing or network with
   const h = await host((_req, res) => { calls += 1; json(res, 500, {}); }); t.after(h.close);
   const agentKey = await key(async data => { signs += 1; return nodeSign('sha256', data, { key: privateKey, dsaEncoding: 'ieee-p1363' }); });
   assert.throws(() => createTokenClient(config(h, agentKey, { tls: { ca: 'not a PEM certificate' } })), TypeError);
+  const systemTrust = createTokenClient(config(h, agentKey, { tls: {} }));
+  await systemTrust.close();
   const foreign = certificates();
   t.after(() => rmSync(foreign.dir, { recursive: true, force: true }));
   const untrusted = createTokenClient(config(h, agentKey, { tls: { ca: foreign.ca } }));
