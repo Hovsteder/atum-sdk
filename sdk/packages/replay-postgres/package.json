@@ -1,0 +1,39 @@
+{
+  "name": "@atum/replay-postgres",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": "./src/store.mjs",
+    "./nonce-challenge": "./src/nonce-challenge.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.mjs",
+    "test:postgres": "python3 tools/test-postgres.py"
+  },
+  "devDependencies": {
+    "@atum/verification": "0.1.0-rc.1",
+    "jose": "6.2.14",
+    "pg": "8.20.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hovsteder/atum-sdk.git",
+    "directory": "sdk/packages/replay-postgres"
+  },
+  "bugs": {
+    "url": "https://github.com/Hovsteder/atum-sdk/issues"
+  },
+  "homepage": "https://github.com/Hovsteder/atum-sdk#readme",
+  "files": [
+    "src",
+    "README.md",
+    "PROFILE.md",
+    "LICENSE",
+    "NOTICE",
+    "migrations"
+  ]
+}

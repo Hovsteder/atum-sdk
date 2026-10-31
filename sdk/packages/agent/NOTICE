@@ -1,0 +1,6 @@
+ATUM SDK
+Copyright 2026 ATUM contributors
+
+Third-party dependencies retain their respective licenses.
+This release includes SDK clients, verification, replay adapters and examples.
+ATUM hosted services and the sensor-consistency engine are not included.

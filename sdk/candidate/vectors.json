@@ -1,0 +1,571 @@
+{
+  "synthetic": true,
+  "actions": [
+    {
+      "name": "prices.read",
+      "request": {
+        "action": "prices.read",
+        "parameters": {}
+      },
+      "canonical": "{\"action\":\"prices.read\",\"parameters\":{}}",
+      "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d"
+    },
+    {
+      "name": "order.preview-min-no-price",
+      "request": {
+        "action": "order.preview",
+        "parameters": {
+          "amount": 1,
+          "duration": 1,
+          "resource": "ENERGY"
+        }
+      },
+      "canonical": "{\"action\":\"order.preview\",\"parameters\":{\"amount\":1,\"duration\":1,\"resource\":\"ENERGY\"}}",
+      "action_hash": "sha256:2e7926fc624402e6cc35033b7acd9bfa04a1596bc1873b408b61e2bf4916507e"
+    },
+    {
+      "name": "order.preview-max-with-price",
+      "request": {
+        "action": "order.preview",
+        "parameters": {
+          "amount": 1000000000,
+          "duration": 2592000,
+          "max_price_sun": 1000000000000,
+          "resource": "BANDWIDTH"
+        }
+      },
+      "canonical": "{\"action\":\"order.preview\",\"parameters\":{\"amount\":1000000000,\"duration\":2592000,\"max_price_sun\":1000000000000,\"resource\":\"BANDWIDTH\"}}",
+      "action_hash": "sha256:89a2d13b5b91fc1060f32cfc7e5d1d649a76d8c0a2ef6cfa16b625229bf4f6b5"
+    },
+    {
+      "name": "order.preview-integral-number-normalization",
+      "request": {
+        "action": "order.preview",
+        "parameters": {
+          "amount": 1.0,
+          "duration": 30.0,
+          "max_price_sun": 1.0,
+          "resource": "ENERGY"
+        }
+      },
+      "canonical": "{\"action\":\"order.preview\",\"parameters\":{\"amount\":1,\"duration\":30,\"max_price_sun\":1,\"resource\":\"ENERGY\"}}",
+      "action_hash": "sha256:9d51f9528f41bf55f919f210a07e22ea20218cd0b76362c20743771e5b6de13e"
+    },
+    {
+      "name": "sandbox.execute-min-no-price",
+      "request": {
+        "action": "sandbox.execute",
+        "parameters": {
+          "amount": 1,
+          "duration": 1,
+          "resource": "ENERGY"
+        }
+      },
+      "canonical": "{\"action\":\"sandbox.execute\",\"parameters\":{\"amount\":1,\"duration\":1,\"resource\":\"ENERGY\"}}",
+      "action_hash": "sha256:dab06892e610bf80520cbd36044551da7f4f28605ad03522d3c7c70e82677737"
+    }
+  ],
+  "contexts": [
+    {
+      "name": "prices-without-account",
+      "context": {
+        "protocol_version": "0.1.0-draft.2",
+        "resource_profile_version": "v1-draft.1",
+        "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+        "issuer": "issuer.synthetic.test",
+        "audience": "resource.synthetic.test",
+        "environment": "sandbox",
+        "tenant_id": "tenant.alpha",
+        "resource_id": "resource.synthetic",
+        "quota_scope_id": "quota.main",
+        "operation_namespace": "ns.energy",
+        "scoped_subject": "subject.alpha",
+        "operation_id": "op-001",
+        "grant_id": "grant-001",
+        "grant_version": 7,
+        "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+        "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d",
+        "account_binding_id": null,
+        "account_binding_version": null,
+        "policy_version": "policy-2026-01",
+        "action": "prices.read"
+      },
+      "action_request": {
+        "action": "prices.read",
+        "parameters": {}
+      },
+      "registration": {
+        "issuer": "issuer.synthetic.test",
+        "audience": "resource.synthetic.test",
+        "environment": "sandbox",
+        "tenant_id": "tenant.alpha",
+        "resource_id": "resource.synthetic",
+        "quota_scope_id": "quota.main",
+        "operation_namespace": "ns.energy",
+        "resource_profile_version": "v1-draft.1",
+        "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+        "policy_version": "policy-2026-01",
+        "account_required_actions": []
+      },
+      "intent_hash": "sha256:22dc69edc34aaa218846ce42fba1f3f92d122669f615ba1adb08066376f46e34",
+      "operation_key": [
+        "issuer.synthetic.test",
+        "sandbox",
+        "tenant.alpha",
+        "resource.synthetic",
+        "quota.main",
+        "ns.energy",
+        "subject.alpha",
+        "op-001"
+      ],
+      "quota_key": [
+        "issuer.synthetic.test",
+        "sandbox",
+        "tenant.alpha",
+        "resource.synthetic",
+        "quota.main",
+        "subject.alpha"
+      ]
+    },
+    {
+      "name": "order-with-account",
+      "context": {
+        "protocol_version": "0.1.0-draft.2",
+        "resource_profile_version": "v1-draft.1",
+        "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+        "issuer": "issuer.synthetic.test",
+        "audience": "resource.synthetic.test",
+        "environment": "sandbox",
+        "tenant_id": "tenant.alpha",
+        "resource_id": "resource.synthetic",
+        "quota_scope_id": "quota.main",
+        "operation_namespace": "ns.energy",
+        "scoped_subject": "subject.alpha",
+        "operation_id": "op-002",
+        "grant_id": "grant-001",
+        "grant_version": 7,
+        "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+        "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "action_hash": "sha256:9d51f9528f41bf55f919f210a07e22ea20218cd0b76362c20743771e5b6de13e",
+        "account_binding_id": "acct-001",
+        "account_binding_version": 3,
+        "policy_version": "policy-2026-01",
+        "action": "order.preview"
+      },
+      "action_request": {
+        "action": "order.preview",
+        "parameters": {
+          "amount": 1,
+          "duration": 30,
+          "max_price_sun": 1,
+          "resource": "ENERGY"
+        }
+      },
+      "registration": {
+        "issuer": "issuer.synthetic.test",
+        "audience": "resource.synthetic.test",
+        "environment": "sandbox",
+        "tenant_id": "tenant.alpha",
+        "resource_id": "resource.synthetic",
+        "quota_scope_id": "quota.main",
+        "operation_namespace": "ns.energy",
+        "resource_profile_version": "v1-draft.1",
+        "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+        "policy_version": "policy-2026-01",
+        "account_required_actions": [
+          "order.preview"
+        ]
+      },
+      "intent_hash": "sha256:6bdb28f1ea4126b463cd419212aea705eaaf189e586fc2aa8becddd376070385",
+      "operation_key": [
+        "issuer.synthetic.test",
+        "sandbox",
+        "tenant.alpha",
+        "resource.synthetic",
+        "quota.main",
+        "ns.energy",
+        "subject.alpha",
+        "op-002"
+      ],
+      "quota_key": [
+        "issuer.synthetic.test",
+        "sandbox",
+        "tenant.alpha",
+        "resource.synthetic",
+        "quota.main",
+        "subject.alpha"
+      ]
+    }
+  ],
+  "account_statement": {
+    "statement": {
+      "protocol_version": "0.1.0-draft.2",
+      "purpose": "bind_account",
+      "issuer": "issuer.synthetic.test",
+      "audience": "resource.synthetic.test",
+      "environment": "sandbox",
+      "tenant_id": "tenant.alpha",
+      "resource_id": "resource.synthetic",
+      "quota_scope_id": "quota.main",
+      "scoped_subject": "subject.alpha",
+      "account_binding_id": "acct-001",
+      "account_binding_version": 3,
+      "account_ref": "account-ref-001",
+      "request_id": "request-001",
+      "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+      "created_at_ms": 1700000000000,
+      "expires_at_ms": 1700000060000
+    },
+    "canonical": "{\"account_binding_id\":\"acct-001\",\"account_binding_version\":3,\"account_ref\":\"account-ref-001\",\"audience\":\"resource.synthetic.test\",\"created_at_ms\":1700000000000,\"environment\":\"sandbox\",\"expires_at_ms\":1700000060000,\"issuer\":\"issuer.synthetic.test\",\"nonce\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\",\"protocol_version\":\"0.1.0-draft.2\",\"purpose\":\"bind_account\",\"quota_scope_id\":\"quota.main\",\"request_id\":\"request-001\",\"resource_id\":\"resource.synthetic\",\"scoped_subject\":\"subject.alpha\",\"tenant_id\":\"tenant.alpha\"}",
+    "hash": "sha256:864eafd6d9023e2d7dc67f1283a5a24c4025c12a23a8ff81448d793a493a5018"
+  },
+  "decisions": [
+    {
+      "name": "accept-capped-deadlines",
+      "decision": {
+        "protocol_version": "0.1.0-draft.2",
+        "synthetic": true,
+        "authorization_effect": "none",
+        "context": {
+          "protocol_version": "0.1.0-draft.2",
+          "resource_profile_version": "v1-draft.1",
+          "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+          "issuer": "issuer.synthetic.test",
+          "audience": "resource.synthetic.test",
+          "environment": "sandbox",
+          "tenant_id": "tenant.alpha",
+          "resource_id": "resource.synthetic",
+          "quota_scope_id": "quota.main",
+          "operation_namespace": "ns.energy",
+          "scoped_subject": "subject.alpha",
+          "operation_id": "op-001",
+          "grant_id": "grant-001",
+          "grant_version": 7,
+          "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+          "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d",
+          "account_binding_id": null,
+          "account_binding_version": null,
+          "policy_version": "policy-2026-01",
+          "action": "prices.read"
+        },
+        "intent_hash": "sha256:22dc69edc34aaa218846ce42fba1f3f92d122669f615ba1adb08066376f46e34",
+        "admission_id": "admission-001",
+        "decision": "would_accept",
+        "reason": "synthetic_example_only",
+        "evaluated_at_ms": 1700000000000,
+        "evaluated_uncertainty_ms": 25,
+        "grant_expires_at_ms": 1700000015000,
+        "acceptance_expires_at_ms": 1700000010000,
+        "first_submit_expires_at_ms": 1700000015000
+      },
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 10,
+        "healthy": true
+      },
+      "acceptance": true,
+      "first_submit": false,
+      "already_accepted": false
+    },
+    {
+      "name": "reject-account-unbound",
+      "decision": {
+        "protocol_version": "0.1.0-draft.2",
+        "synthetic": true,
+        "authorization_effect": "none",
+        "context": {
+          "protocol_version": "0.1.0-draft.2",
+          "resource_profile_version": "v1-draft.1",
+          "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+          "issuer": "issuer.synthetic.test",
+          "audience": "resource.synthetic.test",
+          "environment": "sandbox",
+          "tenant_id": "tenant.alpha",
+          "resource_id": "resource.synthetic",
+          "quota_scope_id": "quota.main",
+          "operation_namespace": "ns.energy",
+          "scoped_subject": "subject.alpha",
+          "operation_id": "op-001",
+          "grant_id": "grant-001",
+          "grant_version": 7,
+          "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+          "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d",
+          "account_binding_id": null,
+          "account_binding_version": null,
+          "policy_version": "policy-2026-01",
+          "action": "prices.read"
+        },
+        "intent_hash": "sha256:22dc69edc34aaa218846ce42fba1f3f92d122669f615ba1adb08066376f46e34",
+        "admission_id": "admission-002",
+        "decision": "would_reject",
+        "reason": "account_not_bound",
+        "evaluated_at_ms": 1700000000000,
+        "evaluated_uncertainty_ms": 0,
+        "grant_expires_at_ms": 1700000015000,
+        "acceptance_expires_at_ms": null,
+        "first_submit_expires_at_ms": null
+      },
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "acceptance": false,
+      "first_submit": false,
+      "already_accepted": false
+    },
+    {
+      "name": "accept-full-windows",
+      "decision": {
+        "protocol_version": "0.1.0-draft.2",
+        "synthetic": true,
+        "authorization_effect": "none",
+        "context": {
+          "protocol_version": "0.1.0-draft.2",
+          "resource_profile_version": "v1-draft.1",
+          "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+          "issuer": "issuer.synthetic.test",
+          "audience": "resource.synthetic.test",
+          "environment": "sandbox",
+          "tenant_id": "tenant.alpha",
+          "resource_id": "resource.synthetic",
+          "quota_scope_id": "quota.main",
+          "operation_namespace": "ns.energy",
+          "scoped_subject": "subject.alpha",
+          "operation_id": "op-001",
+          "grant_id": "grant-001",
+          "grant_version": 7,
+          "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+          "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d",
+          "account_binding_id": null,
+          "account_binding_version": null,
+          "policy_version": "policy-2026-01",
+          "action": "prices.read"
+        },
+        "intent_hash": "sha256:22dc69edc34aaa218846ce42fba1f3f92d122669f615ba1adb08066376f46e34",
+        "admission_id": "admission-003",
+        "decision": "would_accept",
+        "reason": "synthetic_example_only",
+        "evaluated_at_ms": 1700000000000,
+        "evaluated_uncertainty_ms": 25,
+        "grant_expires_at_ms": 1700000060000,
+        "acceptance_expires_at_ms": 1700000010000,
+        "first_submit_expires_at_ms": 1700000030000
+      },
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 10,
+        "healthy": true
+      },
+      "acceptance": true,
+      "first_submit": false,
+      "already_accepted": false
+    },
+    {
+      "name": "accept-short-grant",
+      "decision": {
+        "protocol_version": "0.1.0-draft.2",
+        "synthetic": true,
+        "authorization_effect": "none",
+        "context": {
+          "protocol_version": "0.1.0-draft.2",
+          "resource_profile_version": "v1-draft.1",
+          "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+          "issuer": "issuer.synthetic.test",
+          "audience": "resource.synthetic.test",
+          "environment": "sandbox",
+          "tenant_id": "tenant.alpha",
+          "resource_id": "resource.synthetic",
+          "quota_scope_id": "quota.main",
+          "operation_namespace": "ns.energy",
+          "scoped_subject": "subject.alpha",
+          "operation_id": "op-001",
+          "grant_id": "grant-001",
+          "grant_version": 7,
+          "agent_key_thumbprint": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+          "consent_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "action_hash": "sha256:1f591e0195e217ed20d9a4982051657463912a963fdf1a32ffe03e251983607d",
+          "account_binding_id": null,
+          "account_binding_version": null,
+          "policy_version": "policy-2026-01",
+          "action": "prices.read"
+        },
+        "intent_hash": "sha256:22dc69edc34aaa218846ce42fba1f3f92d122669f615ba1adb08066376f46e34",
+        "admission_id": "admission-004",
+        "decision": "would_accept",
+        "reason": "synthetic_example_only",
+        "evaluated_at_ms": 1700000000000,
+        "evaluated_uncertainty_ms": 25,
+        "grant_expires_at_ms": 1700000005000,
+        "acceptance_expires_at_ms": 1700000005000,
+        "first_submit_expires_at_ms": 1700000005000
+      },
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 10,
+        "healthy": true
+      },
+      "acceptance": true,
+      "first_submit": false,
+      "already_accepted": false
+    }
+  ],
+  "boundary_cases": [
+    {
+      "name": "acceptance-at-strict-deadline",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1700000010000,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "expected": false
+    },
+    {
+      "name": "acceptance-before-deadline",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1700000009999,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "expected": true
+    },
+    {
+      "name": "first-submit-needs-accepted",
+      "decision": "accept-capped-deadlines",
+      "stage": "first_submit",
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": false,
+      "expected": false
+    },
+    {
+      "name": "first-submit-after-accept",
+      "decision": "accept-capped-deadlines",
+      "stage": "first_submit",
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": true
+    },
+    {
+      "name": "unhealthy-clock-blocks",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1700000000500,
+        "uncertainty_ms": 0,
+        "healthy": false
+      },
+      "expected": false
+    },
+    {
+      "name": "future-issuer-evaluation",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1699999999900,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "expected": false
+    },
+    {
+      "name": "issuer-uncertainty-too-late",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1699999999900,
+        "uncertainty_ms": 10,
+        "healthy": true
+      },
+      "expected": false
+    },
+    {
+      "name": "clock-addition-overflow",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 9007199254740991,
+        "uncertainty_ms": 1,
+        "healthy": true
+      },
+      "expected_error": "ValueError"
+    },
+    {
+      "name": "acceptance-uncertainty-crosses",
+      "decision": "accept-capped-deadlines",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1700000009995,
+        "uncertainty_ms": 5,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": false
+    },
+    {
+      "name": "first-submit-at-capped-deadline",
+      "decision": "accept-capped-deadlines",
+      "stage": "first_submit",
+      "clock": {
+        "now_ms": 1700000015000,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": false
+    },
+    {
+      "name": "first-submit-after-acceptance-expiry",
+      "decision": "accept-full-windows",
+      "stage": "first_submit",
+      "clock": {
+        "now_ms": 1700000020000,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": true
+    },
+    {
+      "name": "first-submit-at-30s",
+      "decision": "accept-full-windows",
+      "stage": "first_submit",
+      "clock": {
+        "now_ms": 1700000030000,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": false
+    },
+    {
+      "name": "short-grant-expired",
+      "decision": "accept-short-grant",
+      "stage": "acceptance",
+      "clock": {
+        "now_ms": 1700000005000,
+        "uncertainty_ms": 0,
+        "healthy": true
+      },
+      "already_accepted": true,
+      "expected": false
+    }
+  ],
+  "authorization_effect": "none",
+  "protocol_version": "0.1.0-draft.2"
+}

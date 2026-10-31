@@ -1,0 +1,399 @@
+{
+  "version": 1,
+  "registry": {
+    "registration": {
+      "issuer": "https://issuer.example/atum",
+      "audience": "https://resource.example/merx",
+      "environment": "sandbox",
+      "tenant_id": "tenant-1",
+      "resource_id": "resource-1",
+      "quota_scope_id": "scope-1",
+      "operation_namespace": "preview",
+      "resource_profile_version": "v1-draft.1",
+      "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+      "policy_version": "policy-1",
+      "account_required_actions": [
+        "prices.read",
+        "order.preview"
+      ]
+    },
+    "clients": [
+      {
+        "client_id": "agent-1",
+        "flows": [
+          "authorization_code",
+          "device_code"
+        ],
+        "redirect_uris": [
+          "https://agent.example/callback"
+        ],
+        "permissions": [
+          "prices.read",
+          "order.preview",
+          "sandbox.execute"
+        ],
+        "max_grant_limit": 100000,
+        "max_grant_lifetime_ms": 600000
+      }
+    ]
+  },
+  "facts": {
+    "request_id": "123e4567-e89b-42d3-a456-426614174000",
+    "created_at_ms": 1700000000123,
+    "upper_ms": 1700000000123
+  },
+  "input": {
+    "flow": "authorization_code",
+    "client_id": "agent-1",
+    "resource": "https://resource.example/merx",
+    "authorization_details": [
+      {
+        "type": "atum",
+        "permissions": [
+          {
+            "action": "sandbox.execute",
+            "max_amount": 15,
+            "max_duration": 60,
+            "max_price_sun": null
+          },
+          {
+            "action": "prices.read"
+          }
+        ],
+        "grant_limit": 20,
+        "grant_expires_at_ms": 1700000300000
+      }
+    ],
+    "code": {
+      "redirect_uri": "https://agent.example/callback",
+      "code_challenge": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+      "code_challenge_method": "S256",
+      "state": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    },
+    "agent_jwk": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+      "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"
+    }
+  },
+  "device": {
+    "facts": {
+      "request_id": "623e4567-e89b-42d3-a456-426614174000",
+      "created_at_ms": 1700000000123,
+      "upper_ms": 1700000000123
+    },
+    "input": {
+      "flow": "device_code",
+      "client_id": "agent-1",
+      "resource": "https://resource.example/merx",
+      "authorization_details": [
+        {
+          "type": "atum",
+          "permissions": [
+            {
+              "action": "sandbox.execute",
+              "max_amount": 15,
+              "max_duration": 60,
+              "max_price_sun": null
+            },
+            {
+              "action": "prices.read"
+            }
+          ],
+          "grant_limit": 20,
+          "grant_expires_at_ms": 1700000300000
+        }
+      ],
+      "code": null,
+      "agent_jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+        "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"
+      }
+    },
+    "expected": {
+      "request_canonical_b64": "eyJjbGllbnRfaWQiOiJhZ2VudC0xIiwiY29kZSI6bnVsbCwiY3JlYXRlZF9hdF9tcyI6MTcwMDAwMDAwMDEyMywiZW52aXJvbm1lbnQiOiJzYW5kYm94IiwiZXhwaXJlc19hdF9tcyI6MTcwMDAwMDMwMDAwMCwiZmxvdyI6ImRldmljZV9jb2RlIiwiZ3JhbnRfZXhwaXJlc19hdF9tcyI6MTcwMDAwMDMwMDAwMCwiZ3JhbnRfbGltaXQiOjIwLCJpc3N1ZXIiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL2F0dW0iLCJwZXJtaXNzaW9ucyI6W3siYWN0aW9uIjoicHJpY2VzLnJlYWQifSx7ImFjdGlvbiI6InNhbmRib3guZXhlY3V0ZSIsIm1heF9hbW91bnQiOjE1LCJtYXhfZHVyYXRpb24iOjYwLCJtYXhfcHJpY2Vfc3VuIjpudWxsfV0sInByb2ZpbGUiOiJhdHVtLW9hdXRoLXJlcXVlc3QtdjEiLCJyZWdpc3RyYXRpb24iOnsiYWNjb3VudF9yZXF1aXJlZF9hY3Rpb25zIjpbIm9yZGVyLnByZXZpZXciLCJwcmljZXMucmVhZCJdLCJhdWRpZW5jZSI6Imh0dHBzOi8vcmVzb3VyY2UuZXhhbXBsZS9tZXJ4IiwiZW52aXJvbm1lbnQiOiJzYW5kYm94IiwiaXNzdWVyIjoiaHR0cHM6Ly9pc3N1ZXIuZXhhbXBsZS9hdHVtIiwib3BlcmF0aW9uX25hbWVzcGFjZSI6InByZXZpZXciLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS0xIiwicXVvdGFfc2NvcGVfaWQiOiJzY29wZS0xIiwicmVzb3VyY2VfaWQiOiJyZXNvdXJjZS0xIiwicmVzb3VyY2VfcHJvZmlsZV9oYXNoIjoic2hhMjU2OmRjNmY2NDA5YTQ3ZGEyYTk3ZWE3YjRhY2UzMTM5ODVkN2ZjZDRjNmI4NDU5YTU5ZWEwNmIwMTRkZTMwNGExNzUiLCJyZXNvdXJjZV9wcm9maWxlX3ZlcnNpb24iOiJ2MS1kcmFmdC4xIiwidGVuYW50X2lkIjoidGVuYW50LTEifSwicmVxdWVzdF9pZCI6IjYyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsInJlc291cmNlIjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlL21lcngiLCJzY29wZSI6ImF0dW06aW52b2tlIn0=",
+      "request_hash": "sha256:82f5236409adaa2db2f650ab91022a1f0e9140a13f6dac93f231c3bf9ba52fc2",
+      "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+      "proof_record": {
+        "profile": "atum-oauth-proof-v1",
+        "request_id": "623e4567-e89b-42d3-a456-426614174000",
+        "request_hash": "sha256:82f5236409adaa2db2f650ab91022a1f0e9140a13f6dac93f231c3bf9ba52fc2",
+        "challenge_id": "723e4567-e89b-42d3-a456-426614174000",
+        "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+        "proof_compact_hash": "sha256:7a91d697ffde09f398e95ad99e0c427a7d2cc3bb99f530a22c71404834530bd6",
+        "verified_at_ms": 1700000000789,
+        "expires_at_ms": 1700000300000
+      },
+      "proof_hash": "sha256:5d64c3f12e3653e5043266fa5c21ee7f8f1d11cda6a4658c525ba90ea92b6704",
+      "trusted_request": {
+        "version": 1,
+        "request": {
+          "client_id": "agent-1",
+          "code": null,
+          "created_at_ms": 1700000000123,
+          "environment": "sandbox",
+          "expires_at_ms": 1700000300000,
+          "flow": "device_code",
+          "grant_expires_at_ms": 1700000300000,
+          "grant_limit": 20,
+          "issuer": "https://issuer.example/atum",
+          "permissions": [
+            {
+              "action": "prices.read"
+            },
+            {
+              "action": "sandbox.execute",
+              "max_amount": 15,
+              "max_duration": 60,
+              "max_price_sun": null
+            }
+          ],
+          "profile": "atum-oauth-request-v1",
+          "registration": {
+            "account_required_actions": [
+              "order.preview",
+              "prices.read"
+            ],
+            "audience": "https://resource.example/merx",
+            "environment": "sandbox",
+            "issuer": "https://issuer.example/atum",
+            "operation_namespace": "preview",
+            "policy_version": "policy-1",
+            "quota_scope_id": "scope-1",
+            "resource_id": "resource-1",
+            "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+            "resource_profile_version": "v1-draft.1",
+            "tenant_id": "tenant-1"
+          },
+          "request_id": "623e4567-e89b-42d3-a456-426614174000",
+          "resource": "https://resource.example/merx",
+          "scope": "atum:invoke"
+        },
+        "agent_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+          "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"
+        },
+        "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+        "oauth": {
+          "grant_id": "oauth-grant-device-1",
+          "proof_record_id": "723e4567-e89b-42d3-a456-426614174000",
+          "proof_hash": "sha256:5d64c3f12e3653e5043266fa5c21ee7f8f1d11cda6a4658c525ba90ea92b6704",
+          "proof_verified_at_ms": 1700000000789,
+          "proof_expires_at_ms": 1700000300000
+        },
+        "native": {
+          "model": "DeviceCode",
+          "id": "device-1",
+          "expires_at_ms": 1700000180000
+        },
+        "interaction": {
+          "uid": "interaction-device-1",
+          "expires_at_ms": 1700000200000
+        }
+      },
+      "consent_preimage_canonical_b64": "eyJhY2NvdW50X2JpbmRpbmdfaWQiOiJiaW5kaW5nLTEiLCJhY2NvdW50X2JpbmRpbmdfdmVyc2lvbiI6MSwiYXV0aG9yaXphdGlvbl9yZXF1ZXN0Ijp7ImFnZW50X2p3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImF4ZlI4dUVzUWtmNHZPYmxZNlJBOG5jRGZZRXQ2ek9nOUtFNVJkaVl3cFkiLCJ5IjoiVC1OQzR2NGFmNXVPNS10S2ZBLWVGaXZPTTFkck1WN095N1pBYURlX1VmVSJ9LCJhZ2VudF9rZXlfdGh1bWJwcmludCI6Inh4MEJjQS13TW9odzhhdFlESk9lNnBlR01vZGtsRzJ3UkhCbFhITXZsME0iLCJpbnRlcmFjdGlvbiI6eyJleHBpcmVzX2F0X21zIjoxNzAwMDAwMjAwMDAwLCJ1aWQiOiJpbnRlcmFjdGlvbi1kZXZpY2UtMSJ9LCJuYXRpdmUiOnsiZXhwaXJlc19hdF9tcyI6MTcwMDAwMDE4MDAwMCwiaWQiOiJkZXZpY2UtMSIsIm1vZGVsIjoiRGV2aWNlQ29kZSJ9LCJvYXV0aCI6eyJncmFudF9pZCI6Im9hdXRoLWdyYW50LWRldmljZS0xIiwicHJvb2ZfZXhwaXJlc19hdF9tcyI6MTcwMDAwMDMwMDAwMCwicHJvb2ZfaGFzaCI6InNoYTI1Njo1ZDY0YzNmMTJlMzY1M2U1MDQzMjY2ZmE1YzIxZWU3ZjhmMWQxMWNkYTZhNDY1OGM1MjViYTkwZWE5MmI2NzA0IiwicHJvb2ZfcmVjb3JkX2lkIjoiNzIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwicHJvb2ZfdmVyaWZpZWRfYXRfbXMiOjE3MDAwMDAwMDA3ODl9LCJyZXF1ZXN0Ijp7ImNsaWVudF9pZCI6ImFnZW50LTEiLCJjb2RlIjpudWxsLCJjcmVhdGVkX2F0X21zIjoxNzAwMDAwMDAwMTIzLCJlbnZpcm9ubWVudCI6InNhbmRib3giLCJleHBpcmVzX2F0X21zIjoxNzAwMDAwMzAwMDAwLCJmbG93IjoiZGV2aWNlX2NvZGUiLCJncmFudF9leHBpcmVzX2F0X21zIjoxNzAwMDAwMzAwMDAwLCJncmFudF9saW1pdCI6MjAsImlzc3VlciI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUvYXR1bSIsInBlcm1pc3Npb25zIjpbeyJhY3Rpb24iOiJwcmljZXMucmVhZCJ9LHsiYWN0aW9uIjoic2FuZGJveC5leGVjdXRlIiwibWF4X2Ftb3VudCI6MTUsIm1heF9kdXJhdGlvbiI6NjAsIm1heF9wcmljZV9zdW4iOm51bGx9XSwicHJvZmlsZSI6ImF0dW0tb2F1dGgtcmVxdWVzdC12MSIsInJlZ2lzdHJhdGlvbiI6eyJhY2NvdW50X3JlcXVpcmVkX2FjdGlvbnMiOlsib3JkZXIucHJldmlldyIsInByaWNlcy5yZWFkIl0sImF1ZGllbmNlIjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlL21lcngiLCJlbnZpcm9ubWVudCI6InNhbmRib3giLCJpc3N1ZXIiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL2F0dW0iLCJvcGVyYXRpb25fbmFtZXNwYWNlIjoicHJldmlldyIsInBvbGljeV92ZXJzaW9uIjoicG9saWN5LTEiLCJxdW90YV9zY29wZV9pZCI6InNjb3BlLTEiLCJyZXNvdXJjZV9pZCI6InJlc291cmNlLTEiLCJyZXNvdXJjZV9wcm9maWxlX2hhc2giOiJzaGEyNTY6ZGM2ZjY0MDlhNDdkYTJhOTdlYTdiNGFjZTMxMzk4NWQ3ZmNkNGM2Yjg0NTlhNTllYTA2YjAxNGRlMzA0YTE3NSIsInJlc291cmNlX3Byb2ZpbGVfdmVyc2lvbiI6InYxLWRyYWZ0LjEiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtMSJ9LCJyZXF1ZXN0X2lkIjoiNjIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwicmVzb3VyY2UiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUvbWVyeCIsInNjb3BlIjoiYXR1bTppbnZva2UifSwidmVyc2lvbiI6MX0sImdyYW50X2lkIjoiODIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZ3JhbnRfdmVyc2lvbiI6MSwicHJvZmlsZSI6ImF0dW0tb3duZXItY29uc2VudC12MS1kcmFmdC4xIiwicmVxdWVzdF9pZCI6IjYyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsInNjb3BlZF9zdWJqZWN0Ijoic2NvcGVkLTEiLCJzdWJqZWN0X2lkIjoiMzIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIn0=",
+      "consent_hash": "sha256:0a17816a23a1200787f6a06494dc9967d542fa7d6c3292d0a5159dd386e1e313",
+      "owner_context": {
+        "environment": "sandbox",
+        "issuer": "https://issuer.example/atum",
+        "audience": "https://resource.example/merx",
+        "tenant_id": "tenant-1",
+        "resource_id": "resource-1",
+        "quota_scope_id": "scope-1"
+      },
+      "issue_operation_id": "Wlo3amuI2dbIxoPY8Dx4nH7PqyzMnTvLIbjYIIS4PQw",
+      "revoke_operation_id": "fBhsVgYc38DSQ6rRXJbk7q29iGb8DZuPsi15fszFLDY",
+      "event_payload": {
+        "issuer": "https://issuer.example/atum",
+        "environment": "sandbox",
+        "oauth_grant_id": "oauth-grant-device-1",
+        "authority_grant_id": "823e4567-e89b-42d3-a456-426614174000",
+        "request_id": "623e4567-e89b-42d3-a456-426614174000",
+        "revision": 1,
+        "type": "issued",
+        "consent_hash": "sha256:0a17816a23a1200787f6a06494dc9967d542fa7d6c3292d0a5159dd386e1e313",
+        "issued_at_ms": 1700000005000,
+        "revoked_at_ms": null
+      },
+      "event_id": "c3967849-3221-5115-97f2-b116a430312b",
+      "event_hash": "sha256:58c5ef784d110ede809a9c1acc5513bb7045b3a7314cf3f9aa9cffc218a78690"
+    },
+    "proof": {
+      "challenge_id": "723e4567-e89b-42d3-a456-426614174000",
+      "nonce": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "verified_at_ms": 1700000000789,
+      "compact": "eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImF4ZlI4dUVzUWtmNHZPYmxZNlJBOG5jRGZZRXQ2ek9nOUtFNVJkaVl3cFkiLCJ5IjoiVC1OQzR2NGFmNXVPNS10S2ZBLWVGaXZPTTFkck1WN095N1pBYURlX1VmVSJ9LCJ0eXAiOiJhdHVtLW9hdXRoLXJlcXVlc3Qrand0In0.eyJhdWQiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL2F0dW0iLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiYWdlbnQtMSIsImp0aSI6IjcyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsIm5vbmNlIjoiQVFFQkFRRUJBUUVCQVFFQkFRRUJBUUVCQVFFQkFRRUJBUUVCQVFFQkFRRSIsInB1cnBvc2UiOiJwcmVwYXJlX293bmVyX2NvbnNlbnQiLCJyZXF1ZXN0X2hhc2giOiJzaGEyNTY6ODJmNTIzNjQwOWFkYWEyZGIyZjY1MGFiOTEwMjJhMWYwZTkxNDBhMTNmNmRhYzkzZjIzMWMzYmY5YmE1MmZjMiIsInJlcXVlc3RfaWQiOiI2MjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAifQ.FWA9aDBj6TyiABrL_5EFQMofWcyThXi2DWpwhFFtl8whSF0hjqmQhz0em1PeRFCykVgmhvc0OAL-5V00LEI4Bw"
+    },
+    "trusted": {
+      "oauth_grant_id": "oauth-grant-device-1",
+      "native": {
+        "model": "DeviceCode",
+        "id": "device-1",
+        "expires_at_ms": 1700000180000
+      },
+      "interaction": {
+        "uid": "interaction-device-1",
+        "expires_at_ms": 1700000200000
+      }
+    },
+    "consent": {
+      "subject_id": "323e4567-e89b-42d3-a456-426614174000",
+      "scoped_subject": "scoped-1",
+      "grant_id": "823e4567-e89b-42d3-a456-426614174000",
+      "account_binding_id": "binding-1",
+      "account_binding_version": 1
+    }
+  },
+  "test_private_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+    "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+    "d": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE"
+  },
+  "proof": {
+    "challenge_id": "223e4567-e89b-42d3-a456-426614174000",
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "compact": "eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImF4ZlI4dUVzUWtmNHZPYmxZNlJBOG5jRGZZRXQ2ek9nOUtFNVJkaVl3cFkiLCJ5IjoiVC1OQzR2NGFmNXVPNS10S2ZBLWVGaXZPTTFkck1WN095N1pBYURlX1VmVSJ9LCJ0eXAiOiJhdHVtLW9hdXRoLXJlcXVlc3Qrand0In0.eyJhdWQiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL2F0dW0iLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiYWdlbnQtMSIsImp0aSI6IjIyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsIm5vbmNlIjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsInB1cnBvc2UiOiJwcmVwYXJlX293bmVyX2NvbnNlbnQiLCJyZXF1ZXN0X2hhc2giOiJzaGEyNTY6YjZjNDdhNTRiMTBjMjFjN2IxMzkyZDgzZjg1MWYzNDJjMzE1NzE1YzE4NTJjNTdjMDJjODYxMzhlZDI0YzYxOSIsInJlcXVlc3RfaWQiOiIxMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAifQ.46sXzbCbazuDWI1EC1UBw0fPrh1RgdzxvWhKDkHR63qV12ydhGFy4xtCZs2njgV-WxpaoRQ8ebBXU4o9wVXJzw",
+    "verified_at_ms": 1700000000456
+  },
+  "trusted": {
+    "oauth_grant_id": "oauth-grant-1",
+    "native": {
+      "model": "PushedAuthorizationRequest",
+      "id": "par-1",
+      "expires_at_ms": 1700000060000
+    },
+    "interaction": {
+      "uid": "interaction-1",
+      "expires_at_ms": 1700000200000
+    }
+  },
+  "consent": {
+    "subject_id": "323e4567-e89b-42d3-a456-426614174000",
+    "scoped_subject": "scoped-1",
+    "grant_id": "423e4567-e89b-42d3-a456-426614174000",
+    "account_binding_id": "binding-1",
+    "account_binding_version": 1
+  },
+  "expected": {
+    "request_canonical_b64": "eyJjbGllbnRfaWQiOiJhZ2VudC0xIiwiY29kZSI6eyJjb2RlX2NoYWxsZW5nZSI6ImF4ZlI4dUVzUWtmNHZPYmxZNlJBOG5jRGZZRXQ2ek9nOUtFNVJkaVl3cFkiLCJjb2RlX2NoYWxsZW5nZV9tZXRob2QiOiJTMjU2IiwicmVkaXJlY3RfdXJpIjoiaHR0cHM6Ly9hZ2VudC5leGFtcGxlL2NhbGxiYWNrIiwic3RhdGUiOiJBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWiJ9LCJjcmVhdGVkX2F0X21zIjoxNzAwMDAwMDAwMTIzLCJlbnZpcm9ubWVudCI6InNhbmRib3giLCJleHBpcmVzX2F0X21zIjoxNzAwMDAwMzAwMDAwLCJmbG93IjoiYXV0aG9yaXphdGlvbl9jb2RlIiwiZ3JhbnRfZXhwaXJlc19hdF9tcyI6MTcwMDAwMDMwMDAwMCwiZ3JhbnRfbGltaXQiOjIwLCJpc3N1ZXIiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL2F0dW0iLCJwZXJtaXNzaW9ucyI6W3siYWN0aW9uIjoicHJpY2VzLnJlYWQifSx7ImFjdGlvbiI6InNhbmRib3guZXhlY3V0ZSIsIm1heF9hbW91bnQiOjE1LCJtYXhfZHVyYXRpb24iOjYwLCJtYXhfcHJpY2Vfc3VuIjpudWxsfV0sInByb2ZpbGUiOiJhdHVtLW9hdXRoLXJlcXVlc3QtdjEiLCJyZWdpc3RyYXRpb24iOnsiYWNjb3VudF9yZXF1aXJlZF9hY3Rpb25zIjpbIm9yZGVyLnByZXZpZXciLCJwcmljZXMucmVhZCJdLCJhdWRpZW5jZSI6Imh0dHBzOi8vcmVzb3VyY2UuZXhhbXBsZS9tZXJ4IiwiZW52aXJvbm1lbnQiOiJzYW5kYm94IiwiaXNzdWVyIjoiaHR0cHM6Ly9pc3N1ZXIuZXhhbXBsZS9hdHVtIiwib3BlcmF0aW9uX25hbWVzcGFjZSI6InByZXZpZXciLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS0xIiwicXVvdGFfc2NvcGVfaWQiOiJzY29wZS0xIiwicmVzb3VyY2VfaWQiOiJyZXNvdXJjZS0xIiwicmVzb3VyY2VfcHJvZmlsZV9oYXNoIjoic2hhMjU2OmRjNmY2NDA5YTQ3ZGEyYTk3ZWE3YjRhY2UzMTM5ODVkN2ZjZDRjNmI4NDU5YTU5ZWEwNmIwMTRkZTMwNGExNzUiLCJyZXNvdXJjZV9wcm9maWxlX3ZlcnNpb24iOiJ2MS1kcmFmdC4xIiwidGVuYW50X2lkIjoidGVuYW50LTEifSwicmVxdWVzdF9pZCI6IjEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsInJlc291cmNlIjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlL21lcngiLCJzY29wZSI6ImF0dW06aW52b2tlIn0=",
+    "request_hash": "sha256:b6c47a54b10c21c7b1392d83f851f342c315715c1852c57c02c86138ed24c619",
+    "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+    "proof_record": {
+      "profile": "atum-oauth-proof-v1",
+      "request_id": "123e4567-e89b-42d3-a456-426614174000",
+      "request_hash": "sha256:b6c47a54b10c21c7b1392d83f851f342c315715c1852c57c02c86138ed24c619",
+      "challenge_id": "223e4567-e89b-42d3-a456-426614174000",
+      "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+      "proof_compact_hash": "sha256:b0667f8e239827c2ad30a59fd038689e4f05d8950f088a6b905ec500a648bd80",
+      "verified_at_ms": 1700000000456,
+      "expires_at_ms": 1700000300000
+    },
+    "proof_hash": "sha256:a999e897e893345c15e3fd9effdc1ccbdf9cecd4bf6cc989b32505aafbcf18fe",
+    "trusted_request": {
+      "version": 1,
+      "request": {
+        "profile": "atum-oauth-request-v1",
+        "request_id": "123e4567-e89b-42d3-a456-426614174000",
+        "created_at_ms": 1700000000123,
+        "expires_at_ms": 1700000300000,
+        "issuer": "https://issuer.example/atum",
+        "environment": "sandbox",
+        "flow": "authorization_code",
+        "client_id": "agent-1",
+        "registration": {
+          "issuer": "https://issuer.example/atum",
+          "audience": "https://resource.example/merx",
+          "environment": "sandbox",
+          "tenant_id": "tenant-1",
+          "resource_id": "resource-1",
+          "quota_scope_id": "scope-1",
+          "operation_namespace": "preview",
+          "resource_profile_version": "v1-draft.1",
+          "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+          "policy_version": "policy-1",
+          "account_required_actions": [
+            "order.preview",
+            "prices.read"
+          ]
+        },
+        "resource": "https://resource.example/merx",
+        "scope": "atum:invoke",
+        "permissions": [
+          {
+            "action": "prices.read"
+          },
+          {
+            "action": "sandbox.execute",
+            "max_amount": 15,
+            "max_duration": 60,
+            "max_price_sun": null
+          }
+        ],
+        "grant_limit": 20,
+        "grant_expires_at_ms": 1700000300000,
+        "code": {
+          "redirect_uri": "https://agent.example/callback",
+          "code_challenge": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+          "code_challenge_method": "S256",
+          "state": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        }
+      },
+      "agent_jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+        "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"
+      },
+      "agent_key_thumbprint": "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M",
+      "oauth": {
+        "grant_id": "oauth-grant-1",
+        "proof_record_id": "223e4567-e89b-42d3-a456-426614174000",
+        "proof_hash": "sha256:a999e897e893345c15e3fd9effdc1ccbdf9cecd4bf6cc989b32505aafbcf18fe",
+        "proof_verified_at_ms": 1700000000456,
+        "proof_expires_at_ms": 1700000300000
+      },
+      "native": {
+        "model": "PushedAuthorizationRequest",
+        "id": "par-1",
+        "expires_at_ms": 1700000060000
+      },
+      "interaction": {
+        "uid": "interaction-1",
+        "expires_at_ms": 1700000200000
+      }
+    },
+    "consent_preimage_canonical_b64": "eyJhY2NvdW50X2JpbmRpbmdfaWQiOiJiaW5kaW5nLTEiLCJhY2NvdW50X2JpbmRpbmdfdmVyc2lvbiI6MSwiYXV0aG9yaXphdGlvbl9yZXF1ZXN0Ijp7ImFnZW50X2p3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImF4ZlI4dUVzUWtmNHZPYmxZNlJBOG5jRGZZRXQ2ek9nOUtFNVJkaVl3cFkiLCJ5IjoiVC1OQzR2NGFmNXVPNS10S2ZBLWVGaXZPTTFkck1WN095N1pBYURlX1VmVSJ9LCJhZ2VudF9rZXlfdGh1bWJwcmludCI6Inh4MEJjQS13TW9odzhhdFlESk9lNnBlR01vZGtsRzJ3UkhCbFhITXZsME0iLCJpbnRlcmFjdGlvbiI6eyJleHBpcmVzX2F0X21zIjoxNzAwMDAwMjAwMDAwLCJ1aWQiOiJpbnRlcmFjdGlvbi0xIn0sIm5hdGl2ZSI6eyJleHBpcmVzX2F0X21zIjoxNzAwMDAwMDYwMDAwLCJpZCI6InBhci0xIiwibW9kZWwiOiJQdXNoZWRBdXRob3JpemF0aW9uUmVxdWVzdCJ9LCJvYXV0aCI6eyJncmFudF9pZCI6Im9hdXRoLWdyYW50LTEiLCJwcm9vZl9leHBpcmVzX2F0X21zIjoxNzAwMDAwMzAwMDAwLCJwcm9vZl9oYXNoIjoic2hhMjU2OmE5OTllODk3ZTg5MzM0NWMxNWUzZmQ5ZWZmZGMxY2NiZGY5Y2VjZDRiZjZjYzk4OWIzMjUwNWFhZmJjZjE4ZmUiLCJwcm9vZl9yZWNvcmRfaWQiOiIyMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAiLCJwcm9vZl92ZXJpZmllZF9hdF9tcyI6MTcwMDAwMDAwMDQ1Nn0sInJlcXVlc3QiOnsiY2xpZW50X2lkIjoiYWdlbnQtMSIsImNvZGUiOnsiY29kZV9jaGFsbGVuZ2UiOiJheGZSOHVFc1FrZjR2T2JsWTZSQThuY0RmWUV0NnpPZzlLRTVSZGlZd3BZIiwiY29kZV9jaGFsbGVuZ2VfbWV0aG9kIjoiUzI1NiIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vYWdlbnQuZXhhbXBsZS9jYWxsYmFjayIsInN0YXRlIjoiQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVoifSwiY3JlYXRlZF9hdF9tcyI6MTcwMDAwMDAwMDEyMywiZW52aXJvbm1lbnQiOiJzYW5kYm94IiwiZXhwaXJlc19hdF9tcyI6MTcwMDAwMDMwMDAwMCwiZmxvdyI6ImF1dGhvcml6YXRpb25fY29kZSIsImdyYW50X2V4cGlyZXNfYXRfbXMiOjE3MDAwMDAzMDAwMDAsImdyYW50X2xpbWl0IjoyMCwiaXNzdWVyIjoiaHR0cHM6Ly9pc3N1ZXIuZXhhbXBsZS9hdHVtIiwicGVybWlzc2lvbnMiOlt7ImFjdGlvbiI6InByaWNlcy5yZWFkIn0seyJhY3Rpb24iOiJzYW5kYm94LmV4ZWN1dGUiLCJtYXhfYW1vdW50IjoxNSwibWF4X2R1cmF0aW9uIjo2MCwibWF4X3ByaWNlX3N1biI6bnVsbH1dLCJwcm9maWxlIjoiYXR1bS1vYXV0aC1yZXF1ZXN0LXYxIiwicmVnaXN0cmF0aW9uIjp7ImFjY291bnRfcmVxdWlyZWRfYWN0aW9ucyI6WyJvcmRlci5wcmV2aWV3IiwicHJpY2VzLnJlYWQiXSwiYXVkaWVuY2UiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUvbWVyeCIsImVudmlyb25tZW50Ijoic2FuZGJveCIsImlzc3VlciI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUvYXR1bSIsIm9wZXJhdGlvbl9uYW1lc3BhY2UiOiJwcmV2aWV3IiwicG9saWN5X3ZlcnNpb24iOiJwb2xpY3ktMSIsInF1b3RhX3Njb3BlX2lkIjoic2NvcGUtMSIsInJlc291cmNlX2lkIjoicmVzb3VyY2UtMSIsInJlc291cmNlX3Byb2ZpbGVfaGFzaCI6InNoYTI1NjpkYzZmNjQwOWE0N2RhMmE5N2VhN2I0YWNlMzEzOTg1ZDdmY2Q0YzZiODQ1OWE1OWVhMDZiMDE0ZGUzMDRhMTc1IiwicmVzb3VyY2VfcHJvZmlsZV92ZXJzaW9uIjoidjEtZHJhZnQuMSIsInRlbmFudF9pZCI6InRlbmFudC0xIn0sInJlcXVlc3RfaWQiOiIxMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAiLCJyZXNvdXJjZSI6Imh0dHBzOi8vcmVzb3VyY2UuZXhhbXBsZS9tZXJ4Iiwic2NvcGUiOiJhdHVtOmludm9rZSJ9LCJ2ZXJzaW9uIjoxfSwiZ3JhbnRfaWQiOiI0MjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAiLCJncmFudF92ZXJzaW9uIjoxLCJwcm9maWxlIjoiYXR1bS1vd25lci1jb25zZW50LXYxLWRyYWZ0LjEiLCJyZXF1ZXN0X2lkIjoiMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwic2NvcGVkX3N1YmplY3QiOiJzY29wZWQtMSIsInN1YmplY3RfaWQiOiIzMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAifQ==",
+    "consent_hash": "sha256:063a5eccaa8db9ab3e0368d6320516c543982eac797f767dd28b2d4dfc1665d0",
+    "owner_context": {
+      "environment": "sandbox",
+      "issuer": "https://issuer.example/atum",
+      "audience": "https://resource.example/merx",
+      "tenant_id": "tenant-1",
+      "resource_id": "resource-1",
+      "quota_scope_id": "scope-1"
+    },
+    "issue_operation_id": "zQeJ8UnhmTmTkTZG3a8eZB0g_ZB56nPwcooUJEOqru8",
+    "revoke_operation_id": "Z274pe_QSDJUmlCByXMPxzZoza_Q9RUzoYwEAiNsfTw",
+    "event_payload": {
+      "issuer": "https://issuer.example/atum",
+      "environment": "sandbox",
+      "oauth_grant_id": "oauth-grant-1",
+      "authority_grant_id": "423e4567-e89b-42d3-a456-426614174000",
+      "request_id": "123e4567-e89b-42d3-a456-426614174000",
+      "revision": 1,
+      "type": "issued",
+      "consent_hash": "sha256:063a5eccaa8db9ab3e0368d6320516c543982eac797f767dd28b2d4dfc1665d0",
+      "issued_at_ms": 1700000005000,
+      "revoked_at_ms": null
+    },
+    "event_id": "2d03362a-b1d8-5fe7-a35f-e45a23554047",
+    "event_hash": "sha256:04b8a39fd0e1c7ee22379f31884fcedbb7e179f01ac6dd203316600dd63c8d29"
+  }
+}

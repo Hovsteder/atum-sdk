@@ -1,0 +1,22 @@
+{
+  "name": "atum-sdk",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "sdk/packages/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces",
+    "test:types": "tsc -p sdk/packages/agent/test/types/tsconfig.json",
+    "test:postgres": "npm run test:postgres --workspace @atum/replay-postgres",
+    "example:verify": "node examples/verify-proof.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

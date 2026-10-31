@@ -1,0 +1,61 @@
+{
+  "name": "@atum/agent",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.mjs"
+    },
+    "./client": {
+      "types": "./types/client.d.ts",
+      "default": "./src/client.mjs"
+    },
+    "./key": {
+      "types": "./types/key.d.ts",
+      "default": "./src/key.mjs"
+    },
+    "./request-proof": {
+      "types": "./types/request-proof.d.ts",
+      "default": "./src/request-proof.mjs"
+    },
+    "./resource-proof": {
+      "types": "./types/resource-proof.d.ts",
+      "default": "./src/resource-proof.mjs"
+    },
+    "./resource-client": {
+      "types": "./types/resource-client.d.ts",
+      "default": "./src/resource-client.mjs"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@atum/verification": "0.1.0-rc.1",
+    "jose": "6.2.14",
+    "jsonc-parser": "3.3.1"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hovsteder/atum-sdk.git",
+    "directory": "sdk/packages/agent"
+  },
+  "bugs": {
+    "url": "https://github.com/Hovsteder/atum-sdk/issues"
+  },
+  "homepage": "https://github.com/Hovsteder/atum-sdk#readme",
+  "files": [
+    "src",
+    "README.md",
+    "PROFILE.md",
+    "LICENSE",
+    "NOTICE",
+    "types"
+  ]
+}

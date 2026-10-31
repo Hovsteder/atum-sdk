@@ -1,0 +1,40 @@
+{
+  "name": "@atum/verification",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": "./src/verifier.mjs",
+    "./nonce-challenge": "./src/nonce-challenge.mjs",
+    "./context": "./src/context.mjs",
+    "./authority": "./src/authority.mjs",
+    "./resource-client": "./src/resource-client.mjs",
+    "./owner-connector-client": "./src/owner-connector-client.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "jose": "6.2.14",
+    "jsonc-parser": "3.3.1"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hovsteder/atum-sdk.git",
+    "directory": "sdk/packages/verification"
+  },
+  "bugs": {
+    "url": "https://github.com/Hovsteder/atum-sdk/issues"
+  },
+  "homepage": "https://github.com/Hovsteder/atum-sdk#readme",
+  "files": [
+    "src",
+    "README.md",
+    "PROFILE.md",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

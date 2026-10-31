@@ -1,0 +1,81 @@
+{
+  "synthetic": true,
+  "notice": "Synthetic component fixtures; no production authority or private keys.",
+  "registration": {
+    "issuer": "atum.synthetic.test",
+    "audience": "merx.synthetic.test",
+    "environment": "sandbox",
+    "tenant_id": "tenant.alpha",
+    "resource_id": "resource.alpha",
+    "quota_scope_id": "quota.main",
+    "operation_namespace": "sandbox",
+    "resource_profile_version": "v1-draft.1",
+    "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+    "policy_version": "policy.v1",
+    "account_required_actions": [
+      "prices.read",
+      "order.preview",
+      "sandbox.execute"
+    ]
+  },
+  "context": {
+    "protocol_version": "0.1.0-draft.2",
+    "issuer": "atum.synthetic.test",
+    "audience": "merx.synthetic.test",
+    "environment": "sandbox",
+    "tenant_id": "tenant.alpha",
+    "resource_id": "resource.alpha",
+    "quota_scope_id": "quota.main",
+    "operation_namespace": "sandbox",
+    "resource_profile_version": "v1-draft.1",
+    "resource_profile_hash": "sha256:dc6f6409a47da2a97ea7b4ace313985d7fcd4c6b8459a59ea06b014de304a175",
+    "policy_version": "policy.v1",
+    "scoped_subject": "subject.alpha",
+    "operation_id": "operation.alpha",
+    "grant_id": "grant.alpha",
+    "grant_version": 1,
+    "agent_key_thumbprint": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM",
+    "consent_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "action_hash": "sha256:52ff280ef9edeb45658438a4b96b23e1a05241b1632e9034086d9ad465e790db",
+    "account_binding_id": "binding.alpha",
+    "account_binding_version": 1,
+    "action": "sandbox.execute"
+  },
+  "action_request": {
+    "action": "sandbox.execute",
+    "parameters": {
+      "resource": "ENERGY",
+      "amount": 100,
+      "duration": 60,
+      "max_price_sun": 500
+    }
+  },
+  "client_id": "client.alpha",
+  "clock": {
+    "now_ms": 1700000000123,
+    "uncertainty_ms": 0,
+    "healthy": true
+  },
+  "public_keys": {
+    "python-authority": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "nMh2_h-4l1hLrhSrK3c1wOzw5cwnoou4kwSt4otXNso",
+      "y": "4IxAb6efQrcQosZdwR2axDcCvLQjryLnpKpTaViHY6E"
+    }
+  },
+  "cases": [
+    {
+      "name": "python-snapshot",
+      "role": "snapshot",
+      "expected": "valid",
+      "compact": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB5dGhvbi1hdXRob3JpdHkiLCJ0eXAiOiJhdHVtLWdyYW50LXN0YXR1cytqd3QifQ.eyJhdWQiOiJtZXJ4LnN5bnRoZXRpYy50ZXN0IiwiZGF0YSI6eyJldmlkZW5jZSI6bnVsbCwiZ3JhbnQiOnsiY2xpZW50X2lkIjoiY2xpZW50LmFscGhhIiwiZ3JhbnRfZXhwaXJlc19hdF9tcyI6MTcwMDAwMDEwMDEyMywiZ3JhbnRfbGltaXQiOjUsInBlcm1pc3Npb25zIjpbeyJhY3Rpb24iOiJzYW5kYm94LmV4ZWN1dGUiLCJtYXhfYW1vdW50IjoxMDAwLCJtYXhfZHVyYXRpb24iOjYwMCwibWF4X3ByaWNlX3N1biI6MTAwMH1dLCJ0ZW1wbGF0ZSI6eyJhY2NvdW50X2JpbmRpbmdfaWQiOiJiaW5kaW5nLmFscGhhIiwiYWNjb3VudF9iaW5kaW5nX3ZlcnNpb24iOjEsImFnZW50X2tleV90aHVtYnByaW50IjoiQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TSIsImF1ZGllbmNlIjoibWVyeC5zeW50aGV0aWMudGVzdCIsImNvbnNlbnRfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiZW52aXJvbm1lbnQiOiJzYW5kYm94IiwiZ3JhbnRfaWQiOiJncmFudC5hbHBoYSIsImdyYW50X3ZlcnNpb24iOjEsImlzc3VlciI6ImF0dW0uc3ludGhldGljLnRlc3QiLCJvcGVyYXRpb25fbmFtZXNwYWNlIjoic2FuZGJveCIsInBvbGljeV92ZXJzaW9uIjoicG9saWN5LnYxIiwicHJvdG9jb2xfdmVyc2lvbiI6IjAuMS4wLWRyYWZ0LjIiLCJxdW90YV9zY29wZV9pZCI6InF1b3RhLm1haW4iLCJyZXNvdXJjZV9pZCI6InJlc291cmNlLmFscGhhIiwicmVzb3VyY2VfcHJvZmlsZV9oYXNoIjoic2hhMjU2OmRjNmY2NDA5YTQ3ZGEyYTk3ZWE3YjRhY2UzMTM5ODVkN2ZjZDRjNmI4NDU5YTU5ZWEwNmIwMTRkZTMwNGExNzUiLCJyZXNvdXJjZV9wcm9maWxlX3ZlcnNpb24iOiJ2MS1kcmFmdC4xIiwic2NvcGVkX3N1YmplY3QiOiJzdWJqZWN0LmFscGhhIiwidGVuYW50X2lkIjoidGVuYW50LmFscGhhIn19LCJpc3N1ZWRfYXRfbXMiOjE3MDAwMDAwMDAxMjMsInN0YXR1cyI6ImFjdGl2ZSIsInZhbGlkX3VudGlsX21zIjoxNzAwMDAwMDMwMTIzfSwiZXhwIjoxNzAwMDAwMDMxLCJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImF0dW0uc3ludGhldGljLnRlc3QiLCJqdGkiOiJZQm50VnUzNmRObHZEc3hCR2dmVDEtbnNDVkl3dzVZTyIsInByb2ZpbGUiOiJhdHVtLWdyYW50LXN0YXR1cy12MS1kcmFmdC4xIiwic3ViIjoic3ViamVjdC5hbHBoYSJ9.yE4JlnkBO6d5cxPYAR7EebS3unZ5tiTHiYaydEVvOrwbzFRodum_Dn8BLI_OdDUKK_fawm7jrn7ntWOpA7eM-w"
+    },
+    {
+      "name": "python-admission",
+      "role": "admission",
+      "expected": "valid",
+      "compact": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB5dGhvbi1hdXRob3JpdHkiLCJ0eXAiOiJhdHVtLWFkbWlzc2lvbitqd3QifQ.eyJhdWQiOiJtZXJ4LnN5bnRoZXRpYy50ZXN0IiwiZGF0YSI6eyJhY2NlcHRhbmNlX2V4cGlyZXNfYXRfbXMiOjE3MDAwMDAwMTAxMjMsImFkbWlzc2lvbl9pZCI6ImFkbWlzc2lvbi5hbHBoYSIsImNvbnRleHQiOnsiYWNjb3VudF9iaW5kaW5nX2lkIjoiYmluZGluZy5hbHBoYSIsImFjY291bnRfYmluZGluZ192ZXJzaW9uIjoxLCJhY3Rpb24iOiJzYW5kYm94LmV4ZWN1dGUiLCJhY3Rpb25faGFzaCI6InNoYTI1Njo1MmZmMjgwZWY5ZWRlYjQ1NjU4NDM4YTRiOTZiMjNlMWEwNTI0MWIxNjMyZTkwMzQwODZkOWFkNDY1ZTc5MGRiIiwiYWdlbnRfa2V5X3RodW1icHJpbnQiOiJBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNIiwiYXVkaWVuY2UiOiJtZXJ4LnN5bnRoZXRpYy50ZXN0IiwiY29uc2VudF9oYXNoIjoic2hhMjU2OmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiLCJlbnZpcm9ubWVudCI6InNhbmRib3giLCJncmFudF9pZCI6ImdyYW50LmFscGhhIiwiZ3JhbnRfdmVyc2lvbiI6MSwiaXNzdWVyIjoiYXR1bS5zeW50aGV0aWMudGVzdCIsIm9wZXJhdGlvbl9pZCI6Im9wZXJhdGlvbi5hbHBoYSIsIm9wZXJhdGlvbl9uYW1lc3BhY2UiOiJzYW5kYm94IiwicG9saWN5X3ZlcnNpb24iOiJwb2xpY3kudjEiLCJwcm90b2NvbF92ZXJzaW9uIjoiMC4xLjAtZHJhZnQuMiIsInF1b3RhX3Njb3BlX2lkIjoicXVvdGEubWFpbiIsInJlc291cmNlX2lkIjoicmVzb3VyY2UuYWxwaGEiLCJyZXNvdXJjZV9wcm9maWxlX2hhc2giOiJzaGEyNTY6ZGM2ZjY0MDlhNDdkYTJhOTdlYTdiNGFjZTMxMzk4NWQ3ZmNkNGM2Yjg0NTlhNTllYTA2YjAxNGRlMzA0YTE3NSIsInJlc291cmNlX3Byb2ZpbGVfdmVyc2lvbiI6InYxLWRyYWZ0LjEiLCJzY29wZWRfc3ViamVjdCI6InN1YmplY3QuYWxwaGEiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQuYWxwaGEifSwiZGVjaXNpb24iOiJhZG1pdHRlZCIsImV2YWx1YXRlZF9hdF9tcyI6MTcwMDAwMDAwMDEyMywiZXZhbHVhdGVkX3VuY2VydGFpbnR5X21zIjowLCJldmlkZW5jZSI6bnVsbCwiZmlyc3Rfc3VibWl0X2V4cGlyZXNfYXRfbXMiOjE3MDAwMDAwMzAxMjMsImdyYW50X2V4cGlyZXNfYXRfbXMiOjE3MDAwMDAxMDAxMjMsImludGVudF9oYXNoIjoic2hhMjU2OjQ1MDVlYWYwYjFlYzIxZGYyM2ZkNmMxZGM2MDA1N2Q5MTkyNDAxZmFmNWJiOGU3ZTI1MjNmNjBiYWFjM2RmMmEiLCJyZWFzb24iOiJhZG1pdHRlZCJ9LCJleHAiOjE3MDAwMDAwMzEsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiYXR1bS5zeW50aGV0aWMudGVzdCIsImp0aSI6ImFkbWlzc2lvbi5hbHBoYSIsInByb2ZpbGUiOiJhdHVtLWFkbWlzc2lvbi12MS1kcmFmdC4xIiwic3ViIjoic3ViamVjdC5hbHBoYSJ9.E_xI3JtdtkONkRAJhY8C4smK1cmYLoM0WvFEoY6jBALzhWIy3zpBIqarmtJiFevVSlUYw9WlwujeNIgaG2b_LQ"
+    }
+  ]
+}
