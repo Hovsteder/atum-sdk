@@ -12,7 +12,7 @@
     "sdk/examples/calendar-resource"
   ],
   "scripts": {
-    "test": "npm test --workspace @atum/agent --workspace @atum/verification --workspace @atum/replay-postgres",
+    "test": "npm test --workspace @atum/agent --workspace @atum/verification --workspace @atum/replay-postgres --workspace atum-calendar-resource-example",
     "test:types": "tsc -p sdk/packages/agent/test/types/tsconfig.json",
     "test:postgres": "npm run test:postgres --workspace @atum/replay-postgres",
     "example:verify": "node examples/verify-proof.mjs"
