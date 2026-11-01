@@ -2,7 +2,7 @@
 import { createPrivateKey, generateKeyPairSync, randomBytes, sign as nodeSign, createHash } from 'node:crypto';
 import { readFile, mkdir, open, rename, chmod, lstat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { unlinkSync } from 'node:fs';
+import { unlinkSync, lstatSync } from 'node:fs';
 import https from 'node:https';
 
 import { createAgentClient, createAgentKey } from '@atum/agent';
@@ -20,11 +20,21 @@ async function saveState(value) { const temp = join(stateDir, `.state-${randomBy
 const command = process.argv[2] ?? 'authorize';
 if (!['authorize','refresh','invoke','status'].includes(command) || (command === 'invoke' && (process.argv.length !== 4 || !/^[A-Za-z0-9._:-]{1,128}$/.test(process.argv[3]))) || (command !== 'invoke' && process.argv.length !== 3)) throw new Error('usage: device-agent.mjs authorize|refresh|status|invoke <operation-label>');
 let lock; try { lock = await acquireLock(); } catch { throw new Error('another Agent process owns this state directory'); }
-process.once('exit', () => { try { unlinkSync(lockPath); } catch {} });
-async function releaseLock() { if (!lock) return; const owned = lock; lock = undefined; try { await owned.close(); } finally { try { const stat = await lstat(lockPath); if (stat.isFile() && !stat.isSymbolicLink()) await unlink(lockPath); } catch (error) { if (error.code !== 'ENOENT') throw error; } } }
+const lockIdentity = await lock.stat();
+const ownsLock = stat => stat.isFile() && !stat.isSymbolicLink() && stat.dev === lockIdentity.dev && stat.ino === lockIdentity.ino;
+const exitCleanup = () => { try { if (ownsLock(lstatSync(lockPath))) unlinkSync(lockPath); } catch {} };
+process.once('exit', exitCleanup);
+async function releaseLock() { if (!lock) return; const owned = lock; lock = undefined; process.removeListener('exit', exitCleanup); try { await owned.close(); } finally { try { const stat = await lstat(lockPath); if (ownsLock(stat)) await unlink(lockPath); } catch (error) { if (error.code !== 'ENOENT') throw error; } } }
 const exact = (value, fields) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.getPrototypeOf(value) === Object.prototype && Object.keys(value).length === fields.length
   && fields.every(field => Object.hasOwn(value, field));
+const DENIALS = new Set(['grant_not_active','grant_expired','account_not_bound','action_not_permitted','parameter_limit','evidence_insufficient','grant_limit_exhausted','authorization_expired']);
+function calendarResult(value) {
+  if (!exact(value, ['permission_checked','resource_acceptance','result']) || value.permission_checked !== true
+      || !['accepted','replayed'].includes(value.resource_acceptance) || !exact(value.result, ['events']) || !Array.isArray(value.result.events) || value.result.events.length > 100
+      || !value.result.events.every(item => exact(item, ['event_id','title','starts_at_ms']) && typeof item.event_id === 'string' && typeof item.title === 'string' && (typeof item.starts_at_ms === 'string' || Number.isSafeInteger(item.starts_at_ms)))) throw new Error('invalid calendar response');
+  return value;
+}
 
 function post(material, ca) {
   const url = new URL(material.url); const body = Buffer.from(material.body, 'utf8');
@@ -77,7 +87,7 @@ if (command === 'status') { process.stdout.write(JSON.stringify({ version: 1, co
 if ((command === 'refresh' || command === 'invoke') && !state?.private_jwk) { await releaseLock(); throw new Error('no confirmed authorization; run authorize with fresh consent'); }
 if ((command === 'refresh' || command === 'invoke') && state.association !== association) { await releaseLock(); throw new Error('Agent configuration, endpoint, or registration changed; obtain fresh consent'); }
 if ((command === 'refresh' || command === 'invoke') && ['attempting','ambiguous'].includes(state.refresh_state)) { await releaseLock(); throw new Error('refresh outcome is unresolved; obtain fresh consent'); }
-if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint)) { await releaseLock(); throw new Error('operation label already belongs to different action or endpoint'); } process.stdout.write(JSON.stringify({ operation: process.argv[3], state: old.state, result: old.state === 'complete' ? old.result : undefined }) + '\n'); await releaseLock(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed') { await releaseLock(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
+if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (old.association !== association || JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint) || !old.context || typeof old.raw_body !== 'string') { await releaseLock(); throw new Error('operation label already belongs to different authorization context'); } process.stdout.write(JSON.stringify(old.state === 'complete' ? { operation: process.argv[3], state: old.state, result: old.result } : { operation: process.argv[3], state: old.state, error: { code: old.code } }) + '\n'); await releaseLock(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed') { await releaseLock(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
 const pair = state?.private_jwk ? null : generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const privateJwk = state?.private_jwk ?? pair.privateKey.export({ format: 'jwk' });
 const publicJwk = state?.public_jwk ?? pair.publicKey.export({ format: 'jwk' });
@@ -136,20 +146,23 @@ try {
     action: actionRequest.action };
   const endpoint = agentConfiguration.resource_endpoint;
   const rawBody = `{"context":${canonicalContext(context, descriptor)},"action_request":${canonicalAction(actionRequest, descriptor)}}`;
-  const operation = { state: 'attempting', operation_id: context.operation_id, endpoint, action_request: actionRequest, context,
+  const operation = { state: 'attempting', association, operation_id: context.operation_id, endpoint, action_request: actionRequest, context,
     raw_body: rawBody, token_fingerprint: createHash('sha256').update(token.access_token, 'ascii').digest('base64url'), key_thumbprint: key.thumbprint };
   await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: operation } });
   let signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
   const input = { access_token: token.access_token, context, action_request: actionRequest };
-  const challenge = await post(await signer.signChallenge(input), resourceCa);
+  const challengeMaterial = await signer.signChallenge(input); if (challengeMaterial.body !== rawBody) throw new Error('signer body mismatch');
+  const challenge = await post(challengeMaterial, resourceCa);
   const nonce = challenge.headers['dpop-nonce'];
   if (challenge.status !== 401 || !exact(challenge.body, ['error']) || challenge.body.error !== 'use_dpop_nonce'
       || typeof nonce !== 'string') throw new Error('resource nonce challenge rejected');
   signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
-  const response = await post(await signer.sign({ ...input, nonce }), resourceCa);
-  if (response.status !== 200 || response.body === null || typeof response.body !== 'object' || Array.isArray(response.body)) throw new Error('calendar operation rejected');
-  await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: { ...operation, state: 'complete', result: response.body } } });
-  process.stdout.write(`${JSON.stringify(response.body)}\n`);
+  const responseMaterial = await signer.sign({ ...input, nonce }); if (responseMaterial.body !== rawBody) throw new Error('signer body mismatch');
+  const response = await post(responseMaterial, resourceCa);
+  if (response.status !== 200) { const code = response.body?.error?.code; if (!DENIALS.has(code)) throw new Error('calendar operation outcome unresolved'); await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: { ...operation, state: 'denied', code } } }); process.stdout.write(JSON.stringify({ error: { code } }) + '\n'); await agent.close(); await releaseLock(); process.exit(1); }
+  const result = calendarResult(response.body);
+  await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: { ...operation, state: 'complete', result } } });
+  process.stdout.write(`${JSON.stringify(result)}\n`);
   }
 } catch {
   process.exitCode = 1;
