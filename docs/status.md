@@ -80,3 +80,20 @@ establish physical history or unique human identity.
 
 The Apache-2.0 license applies to the published SDK code. Hosted service access
 and operational terms are separate.
+
+## Hosted presentation follow-up — 1 November 2026
+
+Passport, its developer portal and the issuer now share the main Atum site's
+navigation, icons and terminology. Signed-out service registration is disabled
+with a sign-in invitation. The portal explains the one-time service secret and
+shows redirect URLs only for authorization-code flow. Consent explicitly notes
+that service domain/company ownership has not been verified. The issuer root
+redirects to the developer entry. No protocol or package release changed.
+
+The public hosted acceptance driver at `8d6e48e1de2090e15b7b75f53308f5c24c0bdbf6`
+passed once after this rollout with the same explicit fixtures described above:
+actual owner/service registration and passkey consent, two calendar requests,
+Agent process recovery, token refresh, private PostgreSQL restart and denial of
+a fresh request after owner revocation. Local cleanup completed without errors.
+The UI selector update follows the new Sign in / Confirm your code labels; it
+does not change authorization or replace the real hosted services with mocks.
