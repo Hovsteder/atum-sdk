@@ -25,7 +25,7 @@ async function readBody(req, length, maxBody, timeoutMs) {
 /** Mount this before body parsers. It accepts only direct TLS Node requests. */
 export async function createProtectedHttpHandler({ authorization, endpoint, onAuthorized, maxBodyBytes = 32 * 1024, readTimeoutMs = 5_000, maxConcurrent = 16 } = {}) {
   if (!endpoint || typeof endpoint !== 'object' || typeof endpoint.method !== 'string' || typeof endpoint.url !== 'string' || typeof onAuthorized !== 'function' || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 1_048_576 || !Number.isSafeInteger(readTimeoutMs) || readTimeoutMs < 1 || readTimeoutMs > 30_000) throw new TypeError('invalid protected HTTP config');
-  if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 128 || endpoint.method !== authorization?.proof?.endpoint?.method || endpoint.url !== authorization?.proof?.endpoint?.url) throw new TypeError('invalid protected HTTP config');
+  if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 128 || typeof authorization?.proof?.replayStore?.issueNonce !== 'function' || endpoint.method !== authorization?.proof?.endpoint?.method || endpoint.url !== authorization?.proof?.endpoint?.url) throw new TypeError('invalid protected HTTP config');
   const verifier=await createCurrentAuthorizationVerifier(authorization); let challenge;
   try { challenge=await createNonceChallengeVerifier({ registration:authorization.registration, ...(Object.hasOwn(authorization,'descriptor')?{descriptor:authorization.descriptor}:{}), issuerKeys:authorization.proof.issuerKeys, endpoint:authorization.proof.endpoint, clock:authorization.clock }); } catch(error) { await verifier.close(); throw error; }
   let closed=false, work=0, drain;
