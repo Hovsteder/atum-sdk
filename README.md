@@ -19,7 +19,7 @@ adapter and are not prerequisites for another service.
 
 **Developer preview: 0.1.0-rc.3.** See [release status](docs/status.md) for the exact published
 version, local acceptance evidence and hosted API availability. The SDK repository
-does not contain the private ATUM server or create an owner's permission by itself.
+does not contain the private Atum server or create an owner's permission by itself.
 
 ## Start here
 

@@ -253,7 +253,7 @@ def run(args):
         cdp, auth_id = authenticator(context, page)
         page.get_by_role("button", name="Create passport").click()
         page.get_by_role("status").get_by_text("Passport created", exact=False).wait_for(timeout=20_000)
-        page.get_by_role("button", name="Sign in with passkey").click()
+        page.locator("#sign-in").click()
         expect(page.locator("#session-panel")).to_be_visible(timeout=20_000)
         credentials = cdp.send("WebAuthn.getCredentials", {"authenticatorId": auth_id})["credentials"]
         report["stage"] = "open service registration"
@@ -302,10 +302,10 @@ def run(args):
         device.goto(args.issuer + "/device", wait_until="networkidle")
         device.locator('input[name="user_code"]').fill(match.group(1))
         device.get_by_role("button", name="Continue", exact=True).click()
-        expect(device.get_by_role("heading", name="Confirm Device")).to_be_visible(timeout=20_000)
+        expect(device.get_by_role("heading", name="Confirm your code")).to_be_visible(timeout=20_000)
         device.get_by_role("button", name="Continue", exact=True).click()
         with context.expect_page() as popup:
-            device.get_by_role("link", name="Open ATUM Passport").click()
+            device.get_by_role("link", name=re.compile("Open Atum Passport", re.I)).click()
         consent = popup.value
         consent.wait_for_load_state("networkidle")
         consent_cdp, consent_id = authenticator(context, consent)
