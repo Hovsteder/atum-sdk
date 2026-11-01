@@ -3,6 +3,48 @@
 Supported reference platform: Node 22.12 or newer on Linux, a local `chronyd`, and PostgreSQL.
 Install the published packages and copy `sdk/examples/calendar-resource` as a starting point; it is a reference service, not a hosted ATUM runtime.
 
+```sh
+git clone https://github.com/Hovsteder/atum-sdk.git atum-sdk
+cd atum-sdk
+npm ci --ignore-scripts
+cd sdk/examples/calendar-resource
+createdb atum_calendar                         # or create this empty database in your managed PostgreSQL
+export ATUM_CALENDAR_DATABASE_URL='postgres://localhost/atum_calendar'
+export ATUM_CLOCK_OBSERVATION_FILE="$PWD/.state/clock.json"
+mkdir -p "$PWD/.state" && chmod 700 "$PWD/.state"
+ATUM_CLOCK_OBSERVATION_FILE="$ATUM_CLOCK_OBSERVATION_FILE" ATUM_CHRONYC_PATH=/usr/bin/chronyc ATUM_CHRONYC_PORT=3231 ../../../node_modules/.bin/atum-clock &
+# Create a development CA and a certificate with the exact public endpoint DNS SAN.
+export ATUM_CALENDAR_TLS_KEY_FILE=/absolute/calendar-key.pem
+export ATUM_CALENDAR_TLS_CERT_FILE=/absolute/calendar-cert.pem
+export ATUM_CALENDAR_CA_FILE=/absolute/development-ca.pem
+export ATUM_CALENDAR_ENDPOINT=https://calendar.example.test:443/calendar/events
+export ATUM_CALENDAR_LISTEN_HOST=127.0.0.1 ATUM_CALENDAR_LISTEN_PORT=8443
+# Register the HTTPS endpoint and calendar.event.read in Passport; copy its scoped service credential.
+export ATUM_SERVICE_ACCESS_URL=https://passport.example.test
+export ATUM_SERVICE_CREDENTIAL=replace-with-service-credential
+export ATUM_SERVICE_ACCESS_CA_FILE=/absolute/passport-ca.pem
+export ATUM_ISSUER_CA_FILE=/absolute/passport-ca.pem
+npm run migrate
+npm start
+```
+
+In a second shell, export the trusted Agent configuration, then use the same state
+directory for every command. A public CA needs no custom CA file; development CA
+files are only for your local certificate chain.
+
+```sh
+export ATUM_AGENT_STATE_DIR="$PWD/.state/agent"; mkdir -p "$ATUM_AGENT_STATE_DIR"; chmod 700 "$ATUM_AGENT_STATE_DIR"
+npm run export-agent-config -- /absolute/agent-config.json
+export ATUM_AGENT_CONFIG_FILE=/absolute/agent-config.json
+export ATUM_CALENDAR_CA_FILE=/absolute/development-ca.pem
+npm run authorize
+npm run agent -- status
+npm run agent -- invoke calendar-read-20261101-1
+npm run agent -- refresh
+# Revoke the grant in Passport, then use a new label; it must be denied.
+npm run agent -- invoke calendar-read-after-revoke
+```
+
 1. Run PostgreSQL and set `ATUM_CALENDAR_DATABASE_URL`; run `npm run migrate` once. The migration only creates the example tables and never drops data.
 2. Create a local development CA and an HTTPS certificate whose SAN exactly names the public `ATUM_CALENDAR_ENDPOINT`. Set `ATUM_CALENDAR_TLS_KEY_FILE`, `ATUM_CALENDAR_TLS_CERT_FILE`, and the matching CA files for the Agent and Passport. Do not disable certificate verification.
 3. Start the independent observer: `ATUM_CLOCK_OBSERVATION_FILE=/absolute/clock.json ATUM_CHRONYC_PATH=/usr/bin/chronyc ATUM_CHRONYC_PORT=3231 atum-clock`. The observer uses local chronyd only. Normal leap status, stratum 1–15, reference age (default maximum 300 seconds), and a combined uncertainty of at most 1000 ms are required. The sample reader refuses observations older than `ATUM_CLOCK_MAX_AGE_MS` (default 1000 ms) and rejects a wall-clock step from the observed monotonic projection.

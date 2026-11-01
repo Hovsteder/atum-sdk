@@ -46,6 +46,11 @@ An interrupted refresh is marked ambiguous and requires fresh consent rather tha
 retrying a one-time credential. Protect backups as credentials; loss means a new
 Agent authorization, not key recovery or encrypted KMS storage.
 
+The Agent removes its exclusive `.lock` on normal exit. After a host crash, inspect
+the saved journal first; only when no Agent process owns the directory may an
+operator remove the stale lock file. Never delete `agent-state.json` to recover a
+lock: unresolved operations must remain fenced.
+
 Web passkey authorization proves this owner's approval under the selected policy.
 Native phone enrollment and physical sensor-history evidence are separate layers;
 a successful web login is not labeled as physical-history verification.

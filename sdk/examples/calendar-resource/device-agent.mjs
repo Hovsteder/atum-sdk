@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { createPrivateKey, generateKeyPairSync, randomBytes, sign as nodeSign, createHash } from 'node:crypto';
-import { readFile, mkdir, open, rename, chmod, lstat } from 'node:fs/promises';
+import { readFile, mkdir, open, rename, chmod, lstat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { unlinkSync } from 'node:fs';
 import https from 'node:https';
 
 import { createAgentClient, createAgentKey } from '@atum/agent';
 import { createProtectedRequestSigner } from '@atum/agent/resource-proof';
-import { actionHash, parseStrictJson } from '@atum/verification/context';
+import { actionHash, canonicalAction, canonicalContext, parseStrictJson } from '@atum/verification/context';
 import { createObservedClock } from './observed-clock.mjs';
 
 const required = name => { const value = process.env[name]; if (!value) throw new Error(`missing ${name}`); return value; };
@@ -19,6 +20,8 @@ async function saveState(value) { const temp = join(stateDir, `.state-${randomBy
 const command = process.argv[2] ?? 'authorize';
 if (!['authorize','refresh','invoke','status'].includes(command) || (command === 'invoke' && (process.argv.length !== 4 || !/^[A-Za-z0-9._:-]{1,128}$/.test(process.argv[3]))) || (command !== 'invoke' && process.argv.length !== 3)) throw new Error('usage: device-agent.mjs authorize|refresh|status|invoke <operation-label>');
 let lock; try { lock = await acquireLock(); } catch { throw new Error('another Agent process owns this state directory'); }
+process.once('exit', () => { try { unlinkSync(lockPath); } catch {} });
+async function releaseLock() { if (!lock) return; const owned = lock; lock = undefined; try { await owned.close(); } finally { try { const stat = await lstat(lockPath); if (stat.isFile() && !stat.isSymbolicLink()) await unlink(lockPath); } catch (error) { if (error.code !== 'ENOENT') throw error; } } }
 const exact = (value, fields) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.getPrototypeOf(value) === Object.prototype && Object.keys(value).length === fields.length
   && fields.every(field => Object.hasOwn(value, field));
@@ -70,10 +73,11 @@ const desiredAction = { action: 'calendar.event.read', parameters: { calendar_id
 if (command === 'invoke' && (!Number.isSafeInteger(desiredAction.parameters.limit) || desiredAction.parameters.limit < 1 || desiredAction.parameters.limit > 100 || !/^[A-Za-z0-9._:-]{1,128}$/.test(desiredAction.parameters.calendar_id))) throw new Error('invalid calendar action parameters');
 
 const state = await loadState();
-if (command === 'status') { process.stdout.write(JSON.stringify({ version: 1, configured: Boolean(state), authorization: state?.authorization_state ?? 'none', refresh: state?.refresh_state ?? 'none', operations: Object.fromEntries(Object.entries(state?.operations ?? {}).map(([label, value]) => [label, value.state])) }) + '\n'); await lock.close(); process.exit(0); }
-if ((command === 'refresh' || command === 'invoke') && !state?.private_jwk) { await lock.close(); throw new Error('no confirmed authorization; run authorize with fresh consent'); }
-if ((command === 'refresh' || command === 'invoke') && state.association !== association) { await lock.close(); throw new Error('Agent configuration, endpoint, or registration changed; obtain fresh consent'); }
-if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint)) { await lock.close(); throw new Error('operation label already belongs to different action or endpoint'); } process.stdout.write(JSON.stringify({ operation: process.argv[3], state: old.state, result: old.state === 'complete' ? old.result : undefined }) + '\n'); await lock.close(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed' || state.refresh_state === 'ambiguous') { await lock.close(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
+if (command === 'status') { process.stdout.write(JSON.stringify({ version: 1, configured: Boolean(state), authorization: state?.authorization_state ?? 'none', refresh: state?.refresh_state ?? 'none', operations: Object.fromEntries(Object.entries(state?.operations ?? {}).map(([label, value]) => [label, value.state])) }) + '\n'); await releaseLock(); process.exit(0); }
+if ((command === 'refresh' || command === 'invoke') && !state?.private_jwk) { await releaseLock(); throw new Error('no confirmed authorization; run authorize with fresh consent'); }
+if ((command === 'refresh' || command === 'invoke') && state.association !== association) { await releaseLock(); throw new Error('Agent configuration, endpoint, or registration changed; obtain fresh consent'); }
+if ((command === 'refresh' || command === 'invoke') && ['attempting','ambiguous'].includes(state.refresh_state)) { await releaseLock(); throw new Error('refresh outcome is unresolved; obtain fresh consent'); }
+if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint)) { await releaseLock(); throw new Error('operation label already belongs to different action or endpoint'); } process.stdout.write(JSON.stringify({ operation: process.argv[3], state: old.state, result: old.state === 'complete' ? old.result : undefined }) + '\n'); await releaseLock(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed') { await releaseLock(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
 const pair = state?.private_jwk ? null : generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const privateJwk = state?.private_jwk ?? pair.privateKey.export({ format: 'jwk' });
 const publicJwk = state?.public_jwk ?? pair.publicKey.export({ format: 'jwk' });
@@ -96,14 +100,16 @@ try {
     await saveState({ ...state, refresh_state: 'confirmed', access_token: refreshed.access_token, refresh_token: refreshed.refresh_token ?? state.refresh_token,
       authorization_details: refreshed.authorization_details ?? state.authorization_details });
     process.stdout.write('Agent refresh confirmed.\n');
-    await lock.close(); process.exit(0);
+    await releaseLock(); process.exit(0);
   }
   let token; let authorizationDetails;
   if (command === 'authorize') {
     const sample = clock(); if (sample.healthy !== true) throw new Error('observed clock is unhealthy');
     const lifetime = Math.min(client.max_grant_lifetime_ms, 240_000);
     const request = { permissions: [{ action: 'calendar.event.read' }], grant_limit: Math.min(client.max_grant_limit, 2), grant_expires_at_ms: sample.now_ms + lifetime };
-    authorizationDetails = [{ type: 'atum', ...request }];
+    await saveState({ version: 1, private_jwk: privateJwk, public_jwk: publicJwk, issuer, client_id: client.client_id,
+      registration: registry.registration, descriptor, endpoint: agentConfiguration.resource_endpoint, association,
+      authorization_state: 'incomplete', refresh_state: 'none', operations: state?.operations ?? {} });
     const flow = await agent.beginDeviceAuthorization(request);
     process.stdout.write(`Open ${flow.verification_uri} and enter ${flow.user_code}.\n`);
     const controller = new AbortController(); process.once('SIGINT', () => controller.abort());
@@ -115,7 +121,7 @@ try {
   if (command === 'authorize') { await saveState({ version: 1, private_jwk: privateJwk, public_jwk: publicJwk, issuer, client_id: client.client_id,
       registration: registry.registration, descriptor, endpoint: agentConfiguration.resource_endpoint, association,
       authorization_state: 'confirmed', refresh_state: 'confirmed', access_token: token.access_token, refresh_token: token.refresh_token ?? null,
-      authorization_details: authorizationDetails, operations: state?.operations ?? {} });
+      authorization_details: token.authorization_details, operations: state?.operations ?? {} });
     process.stdout.write('Agent authorization confirmed. Use a new invoke operation label to request a resource action.\n'); }
   if (command !== 'authorize') {
   const actionRequest = desiredAction;
@@ -129,7 +135,9 @@ try {
     account_binding_id: claims.account_binding_id, account_binding_version: claims.account_binding_version,
     action: actionRequest.action };
   const endpoint = agentConfiguration.resource_endpoint;
-  const operation = { state: 'attempting', operation_id: context.operation_id, endpoint, action_request: actionRequest, key_thumbprint: key.thumbprint };
+  const rawBody = `{"context":${canonicalContext(context, descriptor)},"action_request":${canonicalAction(actionRequest, descriptor)}}`;
+  const operation = { state: 'attempting', operation_id: context.operation_id, endpoint, action_request: actionRequest, context,
+    raw_body: rawBody, token_fingerprint: createHash('sha256').update(token.access_token, 'ascii').digest('base64url'), key_thumbprint: key.thumbprint };
   await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: operation } });
   let signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
   const input = { access_token: token.access_token, context, action_request: actionRequest };
@@ -139,12 +147,11 @@ try {
       || typeof nonce !== 'string') throw new Error('resource nonce challenge rejected');
   signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
   const response = await post(await signer.sign({ ...input, nonce }), resourceCa);
-  if (response.status !== 200) throw new Error('calendar operation rejected');
+  if (response.status !== 200 || response.body === null || typeof response.body !== 'object' || Array.isArray(response.body)) throw new Error('calendar operation rejected');
   await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: { ...operation, state: 'complete', result: response.body } } });
   process.stdout.write(`${JSON.stringify(response.body)}\n`);
   }
 } catch {
   process.exitCode = 1;
   process.stderr.write('ATUM authorization or operation was not confirmed. Do not resubmit an attempted operation automatically.\n');
-} finally { await agent.close(); }
-try { await lock.close(); } catch {}
+} finally { await agent.close(); await releaseLock(); }
