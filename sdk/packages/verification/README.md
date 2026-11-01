@@ -1,6 +1,6 @@
 # ATUM verification component
 
-Public developer-preview package `@atum/verification@0.1.0-rc.2`, Node >=22.12.
+Public developer-preview package `@atum/verification@0.1.0-rc.3`, Node >=22.12.
 This is the protected-request part of G0, consuming the unchanged draft.2 context contract.
 It verifies issuer-signed access tokens, the agent's DPoP proof and the complete operation
 context. It returns `requires_admission: true`; it does not issue an execution permission.

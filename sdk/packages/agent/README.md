@@ -4,7 +4,7 @@
 prepares signed owner-consent requests, runs PAR/PKCE authorization-code and
 Device flows, rotates refresh tokens, and signs protected resource requests.
 
-This is the public `0.1.0-rc.2` developer preview for Node.js 22.12+. Install the matching GitHub release packages; npm registry publication is separate. See [PROFILE.md](./PROFILE.md) for the wire contract and [release status](../../../docs/status.md) for hosted availability.
+This is the public `0.1.0-rc.3` developer preview for Node.js 22.12+. Install the matching GitHub release packages; npm registry publication is separate. See [PROFILE.md](./PROFILE.md) for the wire contract and [release status](../../../docs/status.md) for hosted availability.
 
 The Agent also accepts a trusted `atum.service-actions.v1-draft.1` descriptor
 beside a matching registration. The descriptor names a service-owned finite

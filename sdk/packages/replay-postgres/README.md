@@ -1,6 +1,6 @@
 # ATUM persistent nonce and replay adapter
 
-Public developer-preview package `@atum/replay-postgres@0.1.0-rc.2`, Node >=22.12,
+Public developer-preview package `@atum/replay-postgres@0.1.0-rc.3`, Node >=22.12,
 PostgreSQL 16+. Implements the `replayStore` port of `@atum/verification` without
 changing the draft.2 context or `atum-dpop-v1-draft.1` wire profile.
 

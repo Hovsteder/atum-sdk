@@ -70,42 +70,40 @@ service registry and resource endpoint. It refuses to overwrite an existing
 file. The backend service credential stays with the resource operator and is
 never given to an Agent.
 
-The clock observation file must be replaced atomically by a trusted local clock
-observer. It is exact JSON:
-
-```json
-{"healthy":true,"now_ms":1800000000000,"observed_monotonic_ns":"123456789000","uncertainty_ms":5}
-```
-
-`observed_monotonic_ns` uses the host monotonic clock. The example advances the
-sample only by measured monotonic elapsed time, rejects rollback or stale samples,
-and fails closed if uncertainty exceeds 1000 ms. There is no `Date.now()` healthy
-fallback. `ATUM_CLOCK_MAX_AGE_MS` defaults to 1000 and may be set from 1 through
-60000 for a measured deployment policy.
+The public `atum-clock` command produces the observation file from local chrony.
+See the [complete quickstart](../../../docs/quickstart.md) for database, development
+TLS, real hosted registration and observer commands. The observer and the resource
+must share a host/monotonic clock. The reader rejects stale or stepped observations
+and unhealthy synchronization; it never substitutes a healthy `Date.now()` result.
 
 ## Run a Device Agent
 
-The same service registration is enough to run the included public Agent entry
-point. It creates an in-memory P-256 Agent key, prepares the registered Device
-request, prints the owner verification URI and user code, polls once, performs
-the resource nonce challenge, and submits one calendar read. It never prints the
-token or private key.
+The reference Agent persists its P-256 identity and tokens in an absolute, private
+`ATUM_AGENT_STATE_DIR`. Start with owner consent, then invoke explicitly:
 
 ```sh
 export ATUM_AGENT_CONFIG_FILE='/run/atum/calendar-agent.json'
-export ATUM_CALENDAR_CA_FILE='/run/dev/calendar-ca.pem' # omit for system trust
-export ATUM_CALENDAR_ID='main'
-export ATUM_CALENDAR_LIMIT='10'
+export ATUM_AGENT_STATE_DIR='/run/atum/private-agent'
+export ATUM_CALENDAR_CA_FILE='/run/dev/calendar-ca.pem' # omit for public CA
 npm run authorize
+npm run agent -- invoke first-read
+npm run agent -- invoke first-read  # local saved result, zero HTTP
+npm run agent -- refresh
+npm run agent -- status
 ```
 
-The Agent does not retry an ambiguous business request. A new process creates a
-new Agent key and authorization; production agents must own secure key and token
-persistence.
+New processes reuse that identity. Each label keeps its original context, body,
+key/token fingerprint and outcome. A changed request under an old label rejects.
+An unresolved invocation stays unresolved and is never automatically resubmitted.
+A persisted attempted/ambiguous refresh cannot reuse its one-time credential;
+obtain fresh consent. A normal exit removes only its own process lock. For crash
+recovery, see [Agent operations](../../../docs/agent.md). Do not remove state to
+bypass an unresolved operation.
 
 ## Authorization and acceptance boundary
 
-`resource.mjs` uses public `@atum/verification/current-authorization` APIs. For
+`resource.mjs` composes the public `@atum/verification/node-http` handler with the
+current-authorization APIs. For
 each protected request it verifies the access token and DPoP proof, consumes
 replay state, fetches a fresh signed grant snapshot, requests a fresh signed
 admission and checks both assertions. The returned fact is
@@ -144,6 +142,4 @@ The joined private harness creates real owner passkey consent, issuer tokens,
 current authority and resource PostgreSQL state for two independently registered
 services. The second service proves token issuance and disable/refresh denial; it
 does not invoke a second business resource.
-# Calendar resource reference
-
 See [the public quickstart](../../../docs/quickstart.md) and [Node hosting boundary](../../../docs/node-hosting.md). The resource verifies fresh `current_permission` and then makes its own durable acceptance; it never treats verification as a business result. The Agent state directory holds an owner-only P-256 private key and tokens. Back it up only as sensitive credential material; loss requires fresh consent, and an ambiguous refresh or invocation must not be retried automatically.

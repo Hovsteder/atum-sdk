@@ -53,7 +53,7 @@ npm run test:types
 The offline verification example uses a public synthetic fixture. It demonstrates
 signature and replay checks and explicitly grants no execution authority. The
 calendar example shows the separate current-authorization and service-acceptance
-steps using an operator-provided ATUM host and issued tokens. The hosted entry is
+steps using the public ATUM hosts and owner-approved tokens. The hosted entry is
 [atum.digital/developers](https://atum.digital/developers): create or sign in to
 [Passport](https://passport.atum.digital/), then register a service at
 [Passport developer](https://passport.atum.digital/developer). The issuer is
