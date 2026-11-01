@@ -8,3 +8,5 @@ node_modules/
 .private/
 coverage/
 .documentation-*/
+__pycache__/
+*.pyc

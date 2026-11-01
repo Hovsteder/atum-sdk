@@ -245,3 +245,25 @@ void energyClientCalls;
 void genericServiceCalls;
 void rejectedCalls;
 void handlesSafeError;
+
+// The optional Node host adapter has a concrete current-authority callback and
+// requires nonce issuance in addition to replay consumption.
+import { createProtectedHttpHandler, ProtectedHttpError } from '@atum/verification/node-http';
+import { ObservedSystemClock, createObservedClock, writeClockObservation } from '@atum/verification/clock';
+declare const currentConfig: CurrentAuthorizationConfig;
+async function hostedTypes() {
+  const clock = new ObservedSystemClock({ chronycPath: '/usr/bin/chronyc' });
+  await writeClockObservation('/private/clock.json', await clock.read());
+  const sample = createObservedClock('/private/clock.json')();
+  void sample.healthy;
+  const host = await createProtectedHttpHandler({
+    authorization: { ...currentConfig, proof: { ...currentConfig.proof, replayStore: {
+      ...currentConfig.proof.replayStore, issueNonce: async () => ({ nonce: 'issued-by-store' }),
+    } } }, endpoint: currentConfig.proof.endpoint,
+    onAuthorized(permission) { if (!permission.proof_verified) throw new ProtectedHttpError('invalid_proof'); return { ok: true }; },
+  });
+  await host.close();
+  // @ts-expect-error a consume-only replay store cannot issue a challenge.
+  await createProtectedHttpHandler({ authorization: currentConfig, endpoint: currentConfig.proof.endpoint, onAuthorized: () => ({}) });
+}
+void hostedTypes;

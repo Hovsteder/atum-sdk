@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createPrivateKey, generateKeyPairSync, randomBytes, sign as nodeSign, createHash } from 'node:crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign as nodeSign, createHash } from 'node:crypto';
 import { readFile, mkdir, open, rename, chmod, lstat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { unlinkSync, lstatSync } from 'node:fs';
@@ -7,7 +7,7 @@ import https from 'node:https';
 
 import { createAgentClient, createAgentKey } from '@atum/agent';
 import { createProtectedRequestSigner } from '@atum/agent/resource-proof';
-import { actionHash, canonicalAction, canonicalContext, parseStrictJson } from '@atum/verification/context';
+import { actionHash, canonicalAction, canonicalContext, validateBoundIntent, parseStrictJson } from '@atum/verification/context';
 import { createObservedClock } from './observed-clock.mjs';
 
 const required = name => { const value = process.env[name]; if (!value) throw new Error(`missing ${name}`); return value; };
@@ -39,23 +39,42 @@ function calendarResult(value) {
 function post(material, ca) {
   const url = new URL(material.url); const body = Buffer.from(material.body, 'utf8');
   return new Promise((resolve, reject) => {
+    let timer;
+    const finish = (error, value) => { clearTimeout(timer); if (error) reject(error); else resolve(value); };
     const request = https.request(url, { method: material.method, ...(ca === undefined ? {} : { ca }), servername: url.hostname,
       headers: { host: url.host, authorization: material.authorization, dpop: material.dpop,
         'content-type': 'application/json', 'content-length': String(body.length) } }, response => {
       const chunks = []; let size = 0;
+      response.once('error', error => finish(error));
+      response.once('aborted', () => finish(new Error('resource response interrupted')));
       response.on('data', chunk => { size += chunk.length; if (size > 65_536) request.destroy(new Error('resource response too large')); else chunks.push(chunk); });
       response.on('end', () => {
         try {
           const length = response.headers['content-length'];
           if (response.headers.location || response.headers['transfer-encoding'] || !/^(?:0|[1-9][0-9]*)$/.test(length ?? '')) throw new Error('invalid resource response');
           const bytes = Buffer.concat(chunks); if (Number(length) !== bytes.length) throw new Error('invalid resource response');
-          resolve({ status: response.statusCode, headers: response.headers, body: JSON.parse(bytes.toString('utf8')) });
-        } catch (error) { reject(error); }
+          finish(null, { status: response.statusCode, headers: response.headers, body: parseStrictJson(bytes, 65_536) });
+        } catch (error) { finish(error); }
       });
     });
-    request.setTimeout(5_000, () => request.destroy(new Error('resource request timed out')));
-    request.once('error', reject); request.end(body);
+    timer = setTimeout(() => request.destroy(new Error('resource request timed out')), 5_000);
+    request.once('error', error => finish(error)); request.end(body);
   });
+}
+
+function validateSavedOperation(old, state, association, endpoint, desiredAction, registration, descriptor) {
+  const publicJwk = createPublicKey(createPrivateKey({ key: state.private_jwk, format: 'jwk' })).export({ format: 'jwk' });
+  const thumbprint = createHash('sha256').update(JSON.stringify({ crv: publicJwk.crv, kty: publicJwk.kty, x: publicJwk.x, y: publicJwk.y })).digest('base64url');
+  validateBoundIntent(old.context, old.action_request, registration, descriptor);
+  if (old.association !== association || JSON.stringify(old.endpoint) !== JSON.stringify(endpoint)
+      || canonicalAction(old.action_request, descriptor) !== canonicalAction(desiredAction, descriptor)
+      || old.operation_id !== old.context.operation_id || old.key_thumbprint !== thumbprint
+      || old.context.agent_key_thumbprint !== thumbprint
+      || !/^[A-Za-z0-9_-]{43}$/.test(old.token_fingerprint ?? '')
+      || old.raw_body !== `{"context":${canonicalContext(old.context, descriptor)},"action_request":${canonicalAction(old.action_request, descriptor)}}`
+      || !['attempting','complete','denied'].includes(old.state)
+      || (old.state === 'denied' && !DENIALS.has(old.code))) throw new Error('saved operation is corrupt or belongs to another context');
+  if (old.state === 'complete') calendarResult(old.result);
 }
 
 function tokenPayload(token) {
@@ -87,7 +106,7 @@ if (command === 'status') { process.stdout.write(JSON.stringify({ version: 1, co
 if ((command === 'refresh' || command === 'invoke') && !state?.private_jwk) { await releaseLock(); throw new Error('no confirmed authorization; run authorize with fresh consent'); }
 if ((command === 'refresh' || command === 'invoke') && state.association !== association) { await releaseLock(); throw new Error('Agent configuration, endpoint, or registration changed; obtain fresh consent'); }
 if ((command === 'refresh' || command === 'invoke') && ['attempting','ambiguous'].includes(state.refresh_state)) { await releaseLock(); throw new Error('refresh outcome is unresolved; obtain fresh consent'); }
-if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (old.association !== association || JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint) || !old.context || typeof old.raw_body !== 'string') { await releaseLock(); throw new Error('operation label already belongs to different authorization context'); } process.stdout.write(JSON.stringify(old.state === 'complete' ? { operation: process.argv[3], state: old.state, result: old.result } : { operation: process.argv[3], state: old.state, error: { code: old.code } }) + '\n'); await releaseLock(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed') { await releaseLock(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
+if (command === 'invoke') { const old = Object.hasOwn(state.operations ?? {}, process.argv[3]) ? state.operations[process.argv[3]] : null; if (old) { validateSavedOperation(old, state, association, agentConfiguration.resource_endpoint, desiredAction, registry.registration, descriptor); process.stdout.write(JSON.stringify(old.state === 'complete' ? { operation: process.argv[3], state: old.state, result: old.result } : { operation: process.argv[3], state: old.state, error: { code: old.code } }) + '\n'); await releaseLock(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed') { await releaseLock(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
 const pair = state?.private_jwk ? null : generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const privateJwk = state?.private_jwk ?? pair.privateKey.export({ format: 'jwk' });
 const publicJwk = state?.public_jwk ?? pair.publicKey.export({ format: 'jwk' });
@@ -110,7 +129,7 @@ try {
     await saveState({ ...state, refresh_state: 'confirmed', access_token: refreshed.access_token, refresh_token: refreshed.refresh_token ?? state.refresh_token,
       authorization_details: refreshed.authorization_details ?? state.authorization_details });
     process.stdout.write('Agent refresh confirmed.\n');
-    await releaseLock(); process.exit(0);
+    await agent.close(); await releaseLock(); process.exit(0);
   }
   let token; let authorizationDetails;
   if (command === 'authorize') {

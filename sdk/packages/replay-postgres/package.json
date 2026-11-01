@@ -1,6 +1,6 @@
 {
   "name": "@atum/replay-postgres",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0-rc.3",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -15,7 +15,7 @@
     "test:postgres": "python3 tools/test-postgres.py"
   },
   "devDependencies": {
-    "@atum/verification": "0.1.0-rc.2",
+    "@atum/verification": "0.1.0-rc.3",
     "jose": "6.2.14",
     "pg": "8.20.0"
   },

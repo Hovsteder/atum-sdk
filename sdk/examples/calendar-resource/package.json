@@ -6,9 +6,9 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@atum/agent": "0.1.0-rc.2",
-    "@atum/replay-postgres": "0.1.0-rc.2",
-    "@atum/verification": "0.1.0-rc.2",
+    "@atum/agent": "0.1.0-rc.3",
+    "@atum/replay-postgres": "0.1.0-rc.3",
+    "@atum/verification": "0.1.0-rc.3",
     "pg": "8.20.0"
   },
   "scripts": {

@@ -12,7 +12,7 @@ can use `calendar.event.read`; a document service can use `document.read`. MERX 
 the first reference integrator. Its Energy, pricing and order rules belong to its
 adapter and are not prerequisites for another service.
 
-**Developer preview: 0.1.0-rc.2.** See [release status](docs/status.md) for the exact published
+**Developer preview: 0.1.0-rc.3.** See [release status](docs/status.md) for the exact published
 version, local acceptance evidence and hosted API availability. The SDK repository
 does not contain the private ATUM server or create an owner's permission by itself.
 
@@ -43,7 +43,7 @@ Requirements: Node.js 22.12+, npm, and OpenSSL for local HTTPS tests. Clone the
 matching release tag, then install the workspace:
 
 ```sh
-git clone --branch v0.1.0-rc.2 https://github.com/Hovsteder/atum-sdk.git
+git clone --branch v0.1.0-rc.3 https://github.com/Hovsteder/atum-sdk.git
 cd atum-sdk
 npm ci --ignore-scripts --no-audit --no-fund
 npm run example:verify

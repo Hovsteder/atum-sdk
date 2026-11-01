@@ -1,6 +1,6 @@
 {
   "name": "@atum/verification",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0-rc.3",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -18,14 +18,22 @@
     "./owner-connector-client": "./src/owner-connector-client.mjs",
     "./resource-profiles": "./src/resource-profiles.mjs",
     "./service-profile": "./src/service-profile.mjs",
-    "./merx-compat": "./src/merx-compat.mjs"
-    ,"./clock": { "types": "./src/clock.d.ts", "default": "./src/clock.mjs" }
-    ,"./node-http": { "types": "./src/node-http.d.ts", "default": "./src/node-http.mjs" }
+    "./merx-compat": "./src/merx-compat.mjs",
+    "./clock": {
+      "types": "./src/clock.d.ts",
+      "default": "./src/clock.mjs"
+    },
+    "./node-http": {
+      "types": "./src/node-http.d.ts",
+      "default": "./src/node-http.mjs"
+    }
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"
   },
-  "bin": { "atum-clock": "./bin/atum-clock.mjs" },
+  "bin": {
+    "atum-clock": "./bin/atum-clock.mjs"
+  },
   "dependencies": {
     "jose": "6.2.14",
     "jsonc-parser": "3.3.1"

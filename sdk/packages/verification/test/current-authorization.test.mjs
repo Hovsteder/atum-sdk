@@ -5,10 +5,12 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { PassThrough } from 'node:stream';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 
 import { intentHash } from '../src/context.mjs';
 import { createCurrentAuthorizationVerifier, ResourceTransportError } from '../src/current-authorization.mjs';
+import { createProtectedHttpHandler, ProtectedHttpError } from '../src/node-http.mjs';
 
 const vectors = JSON.parse(readFileSync(new URL('fixtures/proof-vectors.json', import.meta.url)));
 const protectedRequest = vectors.cases[0].input;
@@ -74,6 +76,66 @@ async function verifier(h) {
     authority: { issuerKeys: { 'authority-key': h.publicJwk }, evidencePolicy: null, baseUrl: h.url,
       tls: { ca: h.certs.ca, cert: h.certs.cert, key: h.certs.key }, timeoutMs: 500, maxConcurrent: 1 } });
 }
+
+function handlerConfig(h, onAuthorized = () => ({ ok: true }), extra = {}) {
+  return { endpoint: vectors.endpoint, onAuthorized, ...extra, authorization: {
+    registration: vectors.registration, clock: () => vectors.clock,
+    proof: { issuerKeys: vectors.issuer_keys, endpoint: vectors.endpoint,
+      replayStore: { consume: async () => true, issueNonce: async () => ({ nonce: 'fixture-nonce' }) } },
+    authority: { issuerKeys: { 'authority-key': h.publicJwk }, evidencePolicy: null, baseUrl: h.url,
+      tls: { ca: h.certs.ca, cert: h.certs.cert, key: h.certs.key }, timeoutMs: 500, maxConcurrent: 1 } } };
+}
+function message({ rawHeaders, body = protectedRequest.body, encrypted = true, pending = false } = {}) {
+  const req = new PassThrough(); req.socket = { encrypted }; req.method = vectors.endpoint.method;
+  req.url = new URL(vectors.endpoint.url).pathname;
+  req.rawHeaders = rawHeaders ?? ['Host', new URL(vectors.endpoint.url).host, 'Authorization', protectedRequest.authorization,
+    'DPoP', protectedRequest.dpop, 'Content-Type', 'application/json', 'Content-Length', String(Buffer.byteLength(body))];
+  const res = { writeHead(status, headers) { this.status = status; this.headers = headers; }, end(bytes) { this.body = JSON.parse(bytes); } };
+  if (!pending) req.end(body);
+  return { req, res };
+}
+
+test('protected HTTP raw boundary, concurrent body timeout and drain preserve authority ordering', async t => {
+  const h = await host(); t.after(h.close); let callbacks = 0;
+  const resource = await createProtectedHttpHandler(handlerConfig(h, () => { callbacks++; return { ok: true }; },
+    { maxConcurrent: 1, readTimeoutMs: 30 })); t.after(() => resource.close());
+  const original = message().req.rawHeaders;
+  for (const modify of [
+    a => [...a, 'Host', new URL(vectors.endpoint.url).host],
+    a => a.map((v, i) => i === 1 ? 'localhost:8443' : v),
+    a => [...a, 'Transfer-Encoding', 'chunked'],
+    a => [...a, 'Expect', '100-continue'],
+    a => a.map((v, i) => i === 9 ? '01' : v),
+  ]) {
+    const { req, res } = message({ rawHeaders: modify(original) }); await resource.handle(req, res);
+    assert.equal(res.status, 400); assert.equal(res.body.error.code, 'invalid_request'); req.destroy();
+  }
+  const insecure = message({ encrypted: false }); await resource.handle(insecure.req, insecure.res);
+  assert.equal(insecure.res.status, 400); insecure.req.destroy();
+  assert.equal(callbacks, 0); assert.deepEqual(h.paths, []);
+  const stalled = message({ pending: true }); const pending = resource.handle(stalled.req, stalled.res);
+  const excess = message(); await resource.handle(excess.req, excess.res);
+  assert.equal(excess.res.status, 503); excess.req.destroy();
+  const closing = resource.close(); assert.equal(closing, resource.close());
+  await Promise.all([pending, closing]); assert.equal(stalled.req.destroyed, true);
+  assert.deepEqual(h.paths, []); assert.equal(callbacks, 0);
+});
+
+test('protected HTTP invokes callback only after real signed authority and exposes only typed errors', async t => {
+  const h = await host(); t.after(h.close); let mode = 'success'; let calls = 0;
+  const resource = await createProtectedHttpHandler(handlerConfig(h, current => {
+    calls++; assert.equal(current.authorization_effect, 'current_permission');
+    if (mode === 'typed') throw new ProtectedHttpError('grant_not_active');
+    if (mode === 'lookalike') throw Object.assign(new Error('private diagnostic'), { code: 'grant_not_active', name: 'UsageError' });
+    return { permission_checked: true };
+  })); t.after(() => resource.close());
+  for (const [selected, status, code] of [['success',200,undefined],['typed',403,'grant_not_active'],['lookalike',503,'temporarily_unavailable']]) {
+    mode = selected; const { req, res } = message(); await resource.handle(req, res);
+    assert.equal(res.status, status); assert.equal(res.body.error?.code, code);
+    assert.doesNotMatch(JSON.stringify(res.body), /private diagnostic/);
+  }
+  assert.equal(calls, 3); assert.equal(h.paths.length, 6);
+});
 
 test('fresh composition returns permission facts and preserves resource acceptance duty', async (t) => {
   const h = await host(); t.after(h.close); const current = await verifier(h); t.after(() => current.close());
