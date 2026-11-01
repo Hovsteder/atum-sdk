@@ -1,12 +1,13 @@
 # Connect your service
 
-This is the self-service flow implemented by the ATUM host. Check
-[hosted availability](status.md#hosted-availability) before trying to connect;
-this release does not advertise a running public API URL.
+This is the hosted self-service flow. Begin at
+[atum.digital/developers](https://atum.digital/developers), create or sign in to
+[Passport](https://passport.atum.digital/), then open
+[Passport developer](https://passport.atum.digital/developer).
 
 ## Developer setup
 
-1. Sign in to ATUM with your passkey and open **Connect your service**.
+1. Sign in to Passport with your passkey and open **Connect your service**.
 2. Enter your existing service's name and canonical HTTPS origin, for example
    `https://calendar.example`.
 3. Add the action names your service accepts, one per line, for example
@@ -24,12 +25,12 @@ service's name. This initial profile does not require a partner-account link.
 
 ## Backend configuration
 
-Keep the service credential on your backend. Use it only with the operator's
-trusted service-access HTTPS origin:
+Keep the service credential on your backend. Use it only with the hosted
+service-access HTTPS origin, `https://verify.atum.digital`:
 
 ```http
 GET /v1/service/registration HTTP/1.1
-Host: <service-access-host>
+Host: verify.atum.digital
 Authorization: Bearer <service-credential>
 ```
 

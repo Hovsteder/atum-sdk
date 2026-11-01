@@ -7,16 +7,14 @@ explicit compatibility integration, not a dependency of the generic path.
 
 ## Hosted availability
 
-The self-service entry and public service-access API are implemented in the
-private ATUM host. A developer signs in with a passkey, connects an existing
-service, chooses its actions and OAuth flows, and receives a scoped backend
-credential. An owner separately approves an agent's permission.
-
-**There is no publicly hosted registration/API URL in this release.** Deployment
-still needs the selected domain's DNS/access, persistent operator configuration
-and ordinary public TLS. Source and local acceptance do not establish that a
-public endpoint is running. The SDK cannot manufacture grants or consent when
-those services are unavailable.
+The hosted self-service entry is
+[atum.digital/developers](https://atum.digital/developers). Create or sign in to
+[Passport](https://passport.atum.digital/), then register and manage an existing
+service at [Passport developer](https://passport.atum.digital/developer). The
+issuer is `https://auth.atum.digital`; a backend uses
+`https://verify.atum.digital` as its service-access API. A developer chooses
+actions and OAuth flows and receives a scoped backend credential. An owner still
+separately approves each agent permission.
 
 Service credentials can be rotated and a service can be disabled. New grant
 issuance, refresh and current authorization honor the current service lifecycle.
@@ -26,14 +24,12 @@ Entering a service origin does not verify ownership of its domain or company.
 
 ## Evidence and limits
 
-The independent local journey uses actual passkey consent, the OAuth issuer,
-signed authority checks, durable PostgreSQL replay/usage, and a calendar resource.
-It does not substitute a MERX action or seed a grant. Generated accounts and PKI,
-a virtual WebAuthn authenticator, private databases and a declared test clock are
-test setup, not production attestation. The final journey connected two services without restarting ATUM, used the public
-calendar launcher and Agent, denied a new operation after owner revocation, and
-denied token refresh after disabling the second service. All three disposable
-databases were stopped and removed. Exact checks are listed in the release notes.
+The hosted journey was exercised with public Passport registration/login,
+self-service registration, Device passkey consent, a public Agent/Verify request
+through an ephemeral local calendar resource, and grant revocation. The test
+owner used a virtual WebAuthn authenticator; it is not phone evidence. The local
+calendar resource and its PostgreSQL/replay state were removed. This was not a
+MERX action and it did not assert a post-revocation resource invocation.
 
 Earlier MERX evidence remains at its original tested revisions: actual owner
 connection and code/Device tokens, shared quota, revoke denial, response loss,

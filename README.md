@@ -51,8 +51,11 @@ npm run test:types
 The offline verification example uses a public synthetic fixture. It demonstrates
 signature and replay checks and explicitly grants no execution authority. The
 calendar example shows the separate current-authorization and service-acceptance
-steps using an operator-provided ATUM host and issued tokens. Public ATUM hosting
-is still pending; this release supplies no live signup/API URL.
+steps using an operator-provided ATUM host and issued tokens. The hosted entry is
+[atum.digital/developers](https://atum.digital/developers): create or sign in to
+[Passport](https://passport.atum.digital/), then register a service at
+[Passport developer](https://passport.atum.digital/developer). The issuer is
+`https://auth.atum.digital` and the service API is `https://verify.atum.digital`.
 
 For an existing application, install the matching package tarballs from the
 [GitHub releases](https://github.com/Hovsteder/atum-sdk/releases). Install all three

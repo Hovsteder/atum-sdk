@@ -6,12 +6,14 @@ delivery result. Owners approve Agent grants through the normal passkey consent
 flow. The service then verifies a fresh proof and current signed authority before
 its own durable acceptance step.
 
-The source candidate is not deployed. A service origin entered during signup is
-trusted configuration, not proof that the developer owns that domain.
+ATUM hosts Passport, the issuer and service-access API. A service origin entered
+during signup is trusted configuration, not proof that the developer owns that
+domain; the calendar resource remains the integrator's own backend.
 
 ## Connect the service
 
-An enrolled owner opens the ATUM owner host at `/developer`, enters a service
+An enrolled owner opens
+[Passport developer](https://passport.atum.digital/developer), enters a service
 name, exact HTTPS origin, permission names and either Device flow or HTTPS
 authorization-code callbacks. The current self-service policy accepts only
 generic actions with no partner-account requirement. The owner can list up to
@@ -41,7 +43,7 @@ Install this workspace's local packages, then configure:
 npm ci --ignore-scripts --no-audit --no-fund
 cd sdk/examples/calendar-resource
 
-export ATUM_SERVICE_ACCESS_URL='https://atum-resource-access.example'
+export ATUM_SERVICE_ACCESS_URL='https://verify.atum.digital'
 export ATUM_SERVICE_CREDENTIAL='atum_svc_…'
 export ATUM_CALENDAR_DATABASE_URL='postgresql://…'
 export ATUM_CALENDAR_ENDPOINT='https://calendar.example/v1/atum/operations'
