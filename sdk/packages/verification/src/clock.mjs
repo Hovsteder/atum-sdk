@@ -31,7 +31,7 @@ export class ObservedSystemClock {
     if (typeof chronycPath !== 'string' || !chronycPath.startsWith('/') || !integer(port, 1, 65535) || !integer(timeoutMs, 1, 5_000) || !integer(maxReferenceAgeMs, 1, 3_600_000) || !exact(deps, Object.keys(deps)) || !Object.keys(deps).every(k => ['execute','now','monotonic'].includes(k))) throw new TypeError('invalid observed clock config');
     this.#config = { chronycPath, port, timeoutMs, maxReferenceAgeMs };
     this.#execute = deps.execute ?? (() => new Promise((resolve, reject) => execFile(chronycPath, ['-n', '-h', '127.0.0.1', '-p', String(port), 'tracking'], { encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16_384, env: { ...process.env, LC_ALL: 'C', LANG: 'C' } }, (e, out) => e ? reject(e) : resolve(out))));
-    this.#now = deps.now ?? Date.now; this.#monotonic = deps.monotonic ?? performance.now;
+    this.#now = deps.now ?? Date.now; this.#monotonic = deps.monotonic ?? (() => performance.now());
     if (![this.#execute, this.#now, this.#monotonic].every(v => typeof v === 'function')) throw new TypeError('invalid clock dependencies');
   }
   async read() {

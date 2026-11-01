@@ -15,6 +15,14 @@ test('observed chrony clock accepts Normal bounded sample and rejects unhealthy 
   assert.equal((await bad.read()).healthy, false);
 });
 
+test('default wall and monotonic functions are callable with only an injected chrony command', async () => {
+  const now = new Date();
+  const reference = now.toLocaleString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(',', '');
+  const clock = new ObservedSystemClock({ chronycPath: '/bin/chronyc', maxReferenceAgeMs: 5_000 }, { execute: async () => tracking({ reference }) });
+  const sample = await clock.read();
+  assert.equal(sample.healthy, true);
+});
+
 test('reader rejects stale, rollback and symlink observations while atomic writer produces owner file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'atum-clock-')); const file = join(dir, 'clock.json');
   await writeClockObservation(file, { healthy: true, now_ms: 1000, uncertainty_ms: 2, observed_monotonic_ns: '10' });
