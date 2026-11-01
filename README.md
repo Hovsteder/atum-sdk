@@ -1,11 +1,16 @@
-# ATUM SDK
+# Atum SDK
 
-The public Node reference kit includes a local chrony observer, a direct-TLS protected HTTP boundary, a PostgreSQL-backed calendar example and a durable Device Agent workflow. Start with [docs/quickstart.md](docs/quickstart.md).
+Let AI agents act at your service only with their owner’s approval.
 
-Verify an agent's connection to its owner's passport and the owner's permission
-at your service. An agent obtains owner-approved access, signs each request with
-its own key, and your backend checks that permission through ATUM before applying
-its own rules.
+1. An owner creates an [Atum passport](https://passport.atum.digital/).
+2. You register your service and the permissions it supports.
+3. Your backend verifies each agent request before applying its own rules.
+
+Start with the [calendar example](sdk/examples/calendar-resource/README.md), or follow the
+[public quickstart](docs/quickstart.md).
+
+An agent obtains owner-approved access, signs each request with its own key, and
+your backend checks that permission through Atum before applying its own rules.
 
 A developer connects an existing service and chooses its action names. A calendar
 can use `calendar.event.read`; a document service can use `document.read`. MERX is
@@ -27,7 +32,7 @@ does not contain the private ATUM server or create an owner's permission by itse
 | Store nonce and replay state durably | [PostgreSQL adapter](sdk/packages/replay-postgres/README.md) |
 | Understand hosted registration and separate native evidence | [Status and scope](docs/status.md) |
 
-An integrator's service credential authenticates the service to ATUM. The owner
+An integrator's service credential authenticates the service to Atum. The owner
 separately approves the agent's actions, limit and expiry. Neither a developer
 login, a service credential nor a public passport URL substitutes for that consent.
 
@@ -53,7 +58,7 @@ npm run test:types
 The offline verification example uses a public synthetic fixture. It demonstrates
 signature and replay checks and explicitly grants no execution authority. The
 calendar example shows the separate current-authorization and service-acceptance
-steps using the public ATUM hosts and owner-approved tokens. The hosted entry is
+steps using the public Atum hosts and owner-approved tokens. The hosted entry is
 [atum.digital/developers](https://atum.digital/developers): create or sign in to
 [Passport](https://passport.atum.digital/), then register a service at
 [Passport developer](https://passport.atum.digital/developer). The issuer is
