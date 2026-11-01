@@ -94,6 +94,9 @@ if (exportPath) {
     };
     process.once('SIGINT', () => close('SIGINT').finally(() => process.exit(0)));
     process.once('SIGTERM', () => close('SIGTERM').finally(() => process.exit(0)));
-    server.listen(Number(endpointUrl.port || 443), endpointUrl.hostname, () => process.stdout.write(`calendar resource listening on ${endpointUrl.origin}\n`));
+    const listenHost = process.env.ATUM_CALENDAR_LISTEN_HOST ?? '127.0.0.1';
+    const listenPort = Number(process.env.ATUM_CALENDAR_LISTEN_PORT ?? '8443');
+    if (!Number.isSafeInteger(listenPort) || listenPort < 1 || listenPort > 65535) throw new Error('invalid ATUM_CALENDAR_LISTEN_PORT');
+    server.listen(listenPort, listenHost, () => process.stdout.write(`calendar resource listening on https://${listenHost}:${listenPort} for ${endpointUrl.origin}\n`));
   }
 }

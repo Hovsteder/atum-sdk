@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { createPrivateKey, generateKeyPairSync, randomBytes, sign as nodeSign } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { createPrivateKey, generateKeyPairSync, randomBytes, sign as nodeSign, createHash } from 'node:crypto';
+import { readFile, mkdir, open, rename, chmod, lstat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import https from 'node:https';
 
 import { createAgentClient, createAgentKey } from '@atum/agent';
@@ -9,6 +10,15 @@ import { actionHash, parseStrictJson } from '@atum/verification/context';
 import { createObservedClock } from './observed-clock.mjs';
 
 const required = name => { const value = process.env[name]; if (!value) throw new Error(`missing ${name}`); return value; };
+const stateDir = required('ATUM_AGENT_STATE_DIR');
+if (!stateDir.startsWith('/')) throw new Error('ATUM_AGENT_STATE_DIR must be absolute');
+const statePath = join(stateDir, 'agent-state.json'); const lockPath = join(stateDir, '.lock');
+async function acquireLock() { await mkdir(stateDir, { recursive: true, mode: 0o700 }); const stat = await lstat(stateDir); if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('unsafe state directory'); await chmod(stateDir, 0o700); return open(lockPath, 'wx', 0o600); }
+async function loadState() { try { const named = await lstat(statePath); if (!named.isFile() || named.isSymbolicLink()) throw new Error('unsafe agent state'); const handle = await open(statePath, 'r'); try { const stat = await handle.stat(); if (!stat.isFile() || (stat.mode & 0o077)) throw new Error('unsafe agent state'); return JSON.parse(await handle.readFile('utf8')); } finally { await handle.close(); } } catch (e) { if (e.code === 'ENOENT') return null; throw e; } }
+async function saveState(value) { const temp = join(stateDir, `.state-${randomBytes(12).toString('hex')}`); const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(`${JSON.stringify(value)}\n`); await handle.sync(); } finally { await handle.close(); } await rename(temp, statePath); const dir = await open(dirname(statePath), 'r'); try { await dir.sync(); } finally { await dir.close(); } }
+const command = process.argv[2] ?? 'authorize';
+if (!['authorize','refresh','invoke','status'].includes(command) || (command === 'invoke' && (process.argv.length !== 4 || !/^[A-Za-z0-9._:-]{1,128}$/.test(process.argv[3]))) || (command !== 'invoke' && process.argv.length !== 3)) throw new Error('usage: device-agent.mjs authorize|refresh|status|invoke <operation-label>');
+let lock; try { lock = await acquireLock(); } catch { throw new Error('another Agent process owns this state directory'); }
 const exact = (value, fields) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.getPrototypeOf(value) === Object.prototype && Object.keys(value).length === fields.length
   && fields.every(field => Object.hasOwn(value, field));
@@ -55,10 +65,19 @@ const registry = agentConfiguration.registry; const descriptor = registry?.descr
 if (!exact(registry, ['registration', 'descriptor', 'clients']) || !Array.isArray(registry.clients)) throw new Error('invalid service registration');
 const client = registry.clients.find(value => value?.flows?.includes('device_code') && value?.permissions?.includes('calendar.event.read'));
 if (!client) throw new Error('calendar Device client is not registered');
+const association = createHash('sha256').update(JSON.stringify({ registration: registry.registration, descriptor, client_id: client.client_id, endpoint: agentConfiguration.resource_endpoint })).digest('base64url');
+const desiredAction = { action: 'calendar.event.read', parameters: { calendar_id: process.env.ATUM_CALENDAR_ID ?? 'main', limit: Number(process.env.ATUM_CALENDAR_LIMIT ?? '10') } };
+if (command === 'invoke' && (!Number.isSafeInteger(desiredAction.parameters.limit) || desiredAction.parameters.limit < 1 || desiredAction.parameters.limit > 100 || !/^[A-Za-z0-9._:-]{1,128}$/.test(desiredAction.parameters.calendar_id))) throw new Error('invalid calendar action parameters');
 
-const pair = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-const publicJwk = pair.publicKey.export({ format: 'jwk' });
-const privateKey = createPrivateKey({ key: pair.privateKey.export({ format: 'jwk' }), format: 'jwk' });
+const state = await loadState();
+if (command === 'status') { process.stdout.write(JSON.stringify({ version: 1, configured: Boolean(state), authorization: state?.authorization_state ?? 'none', refresh: state?.refresh_state ?? 'none', operations: Object.fromEntries(Object.entries(state?.operations ?? {}).map(([label, value]) => [label, value.state])) }) + '\n'); await lock.close(); process.exit(0); }
+if ((command === 'refresh' || command === 'invoke') && !state?.private_jwk) { await lock.close(); throw new Error('no confirmed authorization; run authorize with fresh consent'); }
+if ((command === 'refresh' || command === 'invoke') && state.association !== association) { await lock.close(); throw new Error('Agent configuration, endpoint, or registration changed; obtain fresh consent'); }
+if (command === 'invoke') { const old = state.operations?.[process.argv[3]]; if (old) { if (JSON.stringify(old.action_request) !== JSON.stringify(desiredAction) || JSON.stringify(old.endpoint) !== JSON.stringify(agentConfiguration.resource_endpoint)) { await lock.close(); throw new Error('operation label already belongs to different action or endpoint'); } process.stdout.write(JSON.stringify({ operation: process.argv[3], state: old.state, result: old.state === 'complete' ? old.result : undefined }) + '\n'); await lock.close(); process.exit(old.state === 'complete' ? 0 : 1); } if (state.authorization_state !== 'confirmed' || state.refresh_state === 'ambiguous') { await lock.close(); throw new Error('authorization is incomplete; obtain fresh consent'); } }
+const pair = state?.private_jwk ? null : generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const privateJwk = state?.private_jwk ?? pair.privateKey.export({ format: 'jwk' });
+const publicJwk = state?.public_jwk ?? pair.publicKey.export({ format: 'jwk' });
+const privateKey = createPrivateKey({ key: privateJwk, format: 'jwk' });
 const key = await createAgentKey({ publicJwk, timeoutMs: 5_000,
   sign: input => nodeSign('sha256', input, { key: privateKey, dsaEncoding: 'ieee-p1363' }) });
 const issuer = registry.registration.issuer;
@@ -68,18 +87,38 @@ const agent = await createAgentClient({ registration: registry.registration, des
     device_authorization_url: `${issuer}/device/auth`, token_url: `${issuer}/token` },
   tls: issuerCa === undefined ? {} : { ca: issuerCa }, key, clock, timeoutMs: 5_000, maxConcurrent: 2 });
 try {
-  const sample = clock(); if (sample.healthy !== true) throw new Error('observed clock is unhealthy');
-  const lifetime = Math.min(client.max_grant_lifetime_ms, 240_000);
-  const flow = await agent.beginDeviceAuthorization({ permissions: [{ action: 'calendar.event.read' }],
-    grant_limit: Math.min(client.max_grant_limit, 2), grant_expires_at_ms: sample.now_ms + lifetime });
-  process.stdout.write(`Open ${flow.verification_uri} and enter ${flow.user_code}.\n`);
-  const controller = new AbortController(); process.once('SIGINT', () => controller.abort());
-  const token = await flow.poll({ signal: controller.signal });
+  if (command === 'refresh') {
+    if (!state.refresh_token || !state.authorization_details) throw new Error('refresh is incomplete; obtain fresh consent');
+    await saveState({ ...state, refresh_state: 'attempting' });
+    let refreshed;
+    try { refreshed = await agent.refresh({ refresh_token: state.refresh_token, authorization_details: state.authorization_details }); }
+    catch (error) { await saveState({ ...state, refresh_state: 'ambiguous' }); throw error; }
+    await saveState({ ...state, refresh_state: 'confirmed', access_token: refreshed.access_token, refresh_token: refreshed.refresh_token ?? state.refresh_token,
+      authorization_details: refreshed.authorization_details ?? state.authorization_details });
+    process.stdout.write('Agent refresh confirmed.\n');
+    await lock.close(); process.exit(0);
+  }
+  let token; let authorizationDetails;
+  if (command === 'authorize') {
+    const sample = clock(); if (sample.healthy !== true) throw new Error('observed clock is unhealthy');
+    const lifetime = Math.min(client.max_grant_lifetime_ms, 240_000);
+    const request = { permissions: [{ action: 'calendar.event.read' }], grant_limit: Math.min(client.max_grant_limit, 2), grant_expires_at_ms: sample.now_ms + lifetime };
+    authorizationDetails = [{ type: 'atum', ...request }];
+    const flow = await agent.beginDeviceAuthorization(request);
+    process.stdout.write(`Open ${flow.verification_uri} and enter ${flow.user_code}.\n`);
+    const controller = new AbortController(); process.once('SIGINT', () => controller.abort());
+    token = await flow.poll({ signal: controller.signal });
+  } else { token = { access_token: state.access_token }; authorizationDetails = state.authorization_details; }
   const payload = tokenPayload(token.access_token); const claims = payload.atum;
   if (payload.iss !== issuer || payload.aud !== registry.registration.audience || payload.client_id !== client.client_id
       || typeof payload.sub !== 'string' || payload.cnf.jkt !== key.thumbprint) throw new Error('access token context mismatch');
-  const actionRequest = { action: 'calendar.event.read', parameters: {
-    calendar_id: process.env.ATUM_CALENDAR_ID ?? 'main', limit: Number(process.env.ATUM_CALENDAR_LIMIT ?? '10') } };
+  if (command === 'authorize') { await saveState({ version: 1, private_jwk: privateJwk, public_jwk: publicJwk, issuer, client_id: client.client_id,
+      registration: registry.registration, descriptor, endpoint: agentConfiguration.resource_endpoint, association,
+      authorization_state: 'confirmed', refresh_state: 'confirmed', access_token: token.access_token, refresh_token: token.refresh_token ?? null,
+      authorization_details: authorizationDetails, operations: state?.operations ?? {} });
+    process.stdout.write('Agent authorization confirmed. Use a new invoke operation label to request a resource action.\n'); }
+  if (command !== 'authorize') {
+  const actionRequest = desiredAction;
   const context = { protocol_version: '0.1.0-draft.2', resource_profile_version: claims.resource_profile_version,
     resource_profile_hash: claims.resource_profile_hash, issuer: payload.iss, audience: payload.aud,
     environment: claims.environment, tenant_id: claims.tenant_id, resource_id: claims.resource_id,
@@ -90,6 +129,8 @@ try {
     account_binding_id: claims.account_binding_id, account_binding_version: claims.account_binding_version,
     action: actionRequest.action };
   const endpoint = agentConfiguration.resource_endpoint;
+  const operation = { state: 'attempting', operation_id: context.operation_id, endpoint, action_request: actionRequest, key_thumbprint: key.thumbprint };
+  await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: operation } });
   let signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
   const input = { access_token: token.access_token, context, action_request: actionRequest };
   const challenge = await post(await signer.signChallenge(input), resourceCa);
@@ -99,8 +140,11 @@ try {
   signer = createProtectedRequestSigner({ key, registration: registry.registration, descriptor, endpoint, clock, timeoutMs: 5_000 });
   const response = await post(await signer.sign({ ...input, nonce }), resourceCa);
   if (response.status !== 200) throw new Error('calendar operation rejected');
+  await saveState({ ...state, authorization_state: 'confirmed', operations: { ...(state?.operations ?? {}), [process.argv[3]]: { ...operation, state: 'complete', result: response.body } } });
   process.stdout.write(`${JSON.stringify(response.body)}\n`);
+  }
 } catch {
   process.exitCode = 1;
   process.stderr.write('ATUM authorization or operation was not confirmed. Do not resubmit an attempted operation automatically.\n');
 } finally { await agent.close(); }
+try { await lock.close(); } catch {}

@@ -5,6 +5,10 @@ This is the protected-request part of G0, consuming the unchanged draft.2 contex
 It verifies issuer-signed access tokens, the agent's DPoP proof and the complete operation
 context. It returns `requires_admission: true`; it does not issue an execution permission.
 
+## Public hosting helpers
+
+`@atum/verification/clock` provides `ObservedSystemClock`, a local-chronyd observer, an atomic observation writer, and the `atum-clock` executable. It does not set the system clock and it does not claim cryptographic NTP trust. `@atum/verification/node-http` provides `createProtectedHttpHandler`, which owns raw Node HTTP framing, nonce challenge and current-authorization verification before calling `onAuthorized(current_permission)`. The callback remains responsible for resource acceptance, quota and result semantics. See `docs/quickstart.md` and `docs/node-hosting.md` in the SDK repository.
+
 ## Contract and trusted inputs
 
 [PROFILE.md](PROFILE.md) is the exact candidate interface, field, error, timing and replay

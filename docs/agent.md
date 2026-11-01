@@ -36,6 +36,16 @@ hostnames. Close clients when finished; local timeout/close cannot cancel work
 already accepted by a remote service. Persist operation identity across process
 restarts instead of relying only on an in-memory request fence.
 
+The calendar reference Agent uses `authorize`, `refresh`, `invoke <operation-label>`
+and `status`. Its absolute `ATUM_AGENT_STATE_DIR` is an owner-only local-disk
+credential store; it persists one P-256 identity, issued tokens, requested
+authorization details, and the complete or unresolved operation journal. It writes
+an invocation identity before its first HTTP dispatch. Repeating a label only
+returns that saved completion or unresolved state; it never sends another request.
+An interrupted refresh is marked ambiguous and requires fresh consent rather than
+retrying a one-time credential. Protect backups as credentials; loss means a new
+Agent authorization, not key recovery or encrypted KMS storage.
+
 Web passkey authorization proves this owner's approval under the selected policy.
 Native phone enrollment and physical sensor-history evidence are separate layers;
 a successful web login is not labeled as physical-history verification.

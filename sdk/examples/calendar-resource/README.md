@@ -144,3 +144,6 @@ The joined private harness creates real owner passkey consent, issuer tokens,
 current authority and resource PostgreSQL state for two independently registered
 services. The second service proves token issuance and disable/refresh denial; it
 does not invoke a second business resource.
+# Calendar resource reference
+
+See [the public quickstart](../../../docs/quickstart.md) and [Node hosting boundary](../../../docs/node-hosting.md). The resource verifies fresh `current_permission` and then makes its own durable acceptance; it never treats verification as a business result. The Agent state directory holds an owner-only P-256 private key and tokens. Back it up only as sensitive credential material; loss requires fresh consent, and an ambiguous refresh or invocation must not be retried automatically.

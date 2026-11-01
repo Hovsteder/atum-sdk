@@ -12,7 +12,8 @@
     "pg": "8.20.0"
   },
   "scripts": {
-    "authorize": "node device-agent.mjs",
+    "authorize": "node device-agent.mjs authorize",
+    "agent": "node device-agent.mjs",
     "export-agent-config": "node server.mjs --export-agent-config",
     "migrate": "node server.mjs --migrate",
     "start": "node server.mjs"

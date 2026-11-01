@@ -1,5 +1,7 @@
 # ATUM SDK
 
+The public Node reference kit includes a local chrony observer, a direct-TLS protected HTTP boundary, a PostgreSQL-backed calendar example and a durable Device Agent workflow. Start with [docs/quickstart.md](docs/quickstart.md).
+
 Verify an agent's connection to its owner's passport and the owner's permission
 at your service. An agent obtains owner-approved access, signs each request with
 its own key, and your backend checks that permission through ATUM before applying

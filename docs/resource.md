@@ -74,6 +74,14 @@ explicitly. Do not seed grants, reset usage or disable TLS validation on startup
 Keys for issuing agent tokens, signing authority decisions and authenticating a
 service have different roles. A service credential never becomes owner consent.
 
+For Node HTTPS services, `@atum/verification/node-http` supplies
+`createProtectedHttpHandler`. Mount it before parsers on the direct TLS server;
+it validates raw framing, headers, body and nonce/current permission before it
+calls the resource's acceptance callback. It does not trust forwarded headers.
+Supported proxying is transparent TCP/SNI pass-through, rather than ordinary
+HTTP TLS termination. The local `atum-clock` observer uses local chronyd and
+writes atomic observations; stale, unhealthy, or wall-step evidence fails closed.
+
 ## MERX compatibility
 
 MERX is the first reference integrator. It owns its action validators, pricing,

@@ -19,10 +19,13 @@
     "./resource-profiles": "./src/resource-profiles.mjs",
     "./service-profile": "./src/service-profile.mjs",
     "./merx-compat": "./src/merx-compat.mjs"
+    ,"./clock": { "types": "./src/clock.d.ts", "default": "./src/clock.mjs" }
+    ,"./node-http": { "types": "./src/node-http.d.ts", "default": "./src/node-http.mjs" }
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"
   },
+  "bin": { "atum-clock": "./bin/atum-clock.mjs" },
   "dependencies": {
     "jose": "6.2.14",
     "jsonc-parser": "3.3.1"
@@ -39,6 +42,7 @@
   "homepage": "https://github.com/Hovsteder/atum-sdk#readme",
   "files": [
     "src",
+    "bin",
     "README.md",
     "PROFILE.md",
     "LICENSE",
